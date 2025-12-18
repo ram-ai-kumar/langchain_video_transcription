@@ -1,0 +1,65 @@
+# -------------------------
+# Python
+# -------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.log
+
+# -------------------------
+# Virtual Environments
+# -------------------------
+.venv/
+venv/
+env/
+ENV/
+*.env
+
+# -------------------------
+# IDE / Editor
+# -------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# -------------------------
+# OS Files
+# -------------------------
+.DS_Store
+Thumbs.db
+
+# -------------------------
+# Project Artifacts
+# -------------------------
+# Audio extracted from videos
+*.mp3
+
+# Transcripts
+*.txt
+
+# Summaries and study material
+*.md
+
+# Generated PDFs
+*.pdf
+
+# -------------------------
+# Misc
+# -------------------------
+# Pandoc temp files
+*.aux
+*.out
+*.toc
+*.log
+
+# But keep these important files
+!README.md
+!requirements.txt
