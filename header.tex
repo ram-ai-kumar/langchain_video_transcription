@@ -1,0 +1,93 @@
+% Page geometry with standard margins
+\usepackage[a4paper,top=2.5cm,bottom=2.5cm,left=2.5cm,right=2.5cm]{geometry}
+
+% Font and typography
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+% Use modern, readable font with clear bold and italic distinction
+% \usepackage{libertinus}  % Libertinus for a modern serif look
+% Alternatively, uncomment one of these for different styles:
+\usepackage{charter}  % Charter - clean and readable
+% \usepackage{ebgaramond}  % EB Garamond - elegant serif
+% \usepackage{lato}  % Lato - modern sans-serif
+
+\usepackage{microtype}  % Improves typography
+
+% Make bold text even more prominent
+\renewcommand{\bfdefault}{b}  % Use bold weight
+\renewcommand{\mddefault}{m}  % Use medium weight for regular text
+
+% Colors
+\usepackage{xcolor}
+\definecolor{headingcolor}{RGB}{0,102,204}      % Rich royal blue
+\definecolor{subheadingcolor}{RGB}{30,144,255}  % Vibrant dodger blue
+\definecolor{emphasiscolor}{RGB}{220,50,47}     % Rich red
+\definecolor{codebackground}{RGB}{245,245,245}  % Light gray
+\definecolor{linkblue}{RGB}{0,123,255}          % Bright link blue
+
+% Headers and sections
+\usepackage{titlesec}
+\titleformat{\section}
+  {\Large\bfseries\color{headingcolor}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{subheadingcolor}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{subheadingcolor}}{\thesubsubsection}{1em}{}
+
+% Spacing
+\titlespacing*{\section}{0pt}{2ex plus 1ex minus 0.2ex}{1ex plus 0.2ex}
+\titlespacing*{\subsection}{0pt}{1.5ex plus 1ex minus 0.2ex}{0.8ex plus 0.2ex}
+\titlespacing*{\subsubsection}{0pt}{1.2ex plus 0.8ex minus 0.2ex}{0.5ex plus 0.2ex}
+
+% Paragraph formatting
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+
+% Lists
+\usepackage{enumitem}
+\setlist{itemsep=0.3em,topsep=0.5em,parsep=0em}
+
+% Code blocks and verbatim
+\usepackage{fancyvrb}
+\usepackage{listings}
+\lstset{
+  backgroundcolor=\color{codebackground},
+  basicstyle=\small\ttfamily,
+  breaklines=true,
+  frame=single,
+  xleftmargin=0.5cm,
+  xrightmargin=0.5cm
+}
+
+% Tables
+\usepackage{booktabs}
+\usepackage{longtable}
+
+% Links
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=headingcolor,
+  urlcolor=linkblue,
+  pdfborder={0 0 0}
+}
+
+% Page header/footer
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.5pt}
+\renewcommand{\footrulewidth}{0.5pt}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{\thepage}
+\fancyfoot[C]{\small Generated Study Material}
+
+% Better handling of images
+\usepackage{graphicx}
+\setkeys{Gin}{width=0.8\textwidth}
+
+% Line spacing
+\usepackage{setspace}
+\setstretch{1.15}

@@ -111,10 +111,22 @@ def process_video(video_path, whisper_model, generate_pdf=False, llm_model="deep
     # Step 5: PDF
     if generate_pdf:
         if not pdf_file.exists():
+            # Path to the LaTeX header file
+            header_file = Path(__file__).parent / "header.tex"
+
+            pandoc_command = [
+                "pandoc", str(study_file),
+                "-o", str(pdf_file),
+                "--pdf-engine=pdflatex",
+                f"--include-in-header={str(header_file)}",
+                "--variable", "fontsize=12pt",
+                "--toc",  # Table of contents
+                "--toc-depth=3",
+                "--number-sections"
+            ]
+
             spinner("    video > audio > text > markdown > PDF ...", subprocess.run,
-                    ["pandoc", str(study_file),
-                     "-o", str(pdf_file),
-                     "--pdf-engine=pdflatex"], check=True)
+                    pandoc_command, check=True)
         steps.append("PDF")
 
     # Final pipeline line
