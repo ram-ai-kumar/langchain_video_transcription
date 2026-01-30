@@ -11,6 +11,7 @@ The result is a system that demonstrates not only technical execution but also t
 
 ## Features
 
+- **Recursive Processing**: Scans the entire directory subtree and processes files in every folder.
 - **Multi-Source Entry**: Start from **Video**, **Audio**, or **Text** files.
 - **Video → Audio Extraction**: Uses `ffmpeg` to isolate audio streams from video files (skipped if starting from audio).
 - **Audio → Transcript**: Employs [OpenAI Whisper](https://github.com/openai/whisper) for accurate speech-to-text transcription (skipped if starting from text).
@@ -38,7 +39,7 @@ The result is a system that demonstrates not only technical execution but also t
 
 ---
 
-The pipeline is designed as an **intelligent, modular sequence of transformations**. It automatically detects the best starting point for each filename:
+The pipeline is designed as an **intelligent, modular sequence of transformations with a recursive traversal engine**. It automatically scans the entire directory subtree and detects the best starting point for each filename:
 
 - **Video Entry**: `video > audio > transcript > study material > PDF`
 - **Audio Entry**: `audio > transcript > study material > PDF`

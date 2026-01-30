@@ -176,36 +176,43 @@ def process_pipeline(source_path, whisper_model, start_type, generate_pdf=True, 
 def process_directory(directory, whisper_model, generate_pdf=True):
     dir_path = Path(directory)
     
-    # Group files by stem to identify candidates for processing
-    groups = {}
-    for file in dir_path.iterdir():
-        if file.is_file():
-            groups.setdefault(file.stem, []).append(file)
-            
-    for stem, files in groups.items():
-        # Priority for entry point: Video > Audio > Text
-        video_file = next((f for f in files if f.suffix.lower() in VIDEO_EXTENSIONS), None)
-        audio_file = next((f for f in files if f.suffix.lower() in AUDIO_EXTENSIONS), None)
-        text_file = next((f for f in files if f.suffix.lower() in TEXT_EXTENSIONS), None)
+    # Traverse through all subdirectories using os.walk
+    for root, dirs, _ in os.walk(dir_path):
+        current_dir = Path(root)
         
-        source_path = None
-        start_type = None
-        
-        if video_file:
-            source_path = video_file
-            start_type = "video"
-        elif audio_file:
-            source_path = audio_file
-            start_type = "audio"
-        elif text_file:
-            source_path = text_file
-            start_type = "text"
+        # Group files in the current folder by stem
+        groups = {}
+        for file in current_dir.iterdir():
+            if file.is_file():
+                groups.setdefault(file.stem, []).append(file)
+                
+        if not groups:
+            continue
+
+        for stem, files in groups.items():
+            # Priority for entry point: Video > Audio > Text
+            video_file = next((f for f in files if f.suffix.lower() in VIDEO_EXTENSIONS), None)
+            audio_file = next((f for f in files if f.suffix.lower() in AUDIO_EXTENSIONS), None)
+            text_file = next((f for f in files if f.suffix.lower() in TEXT_EXTENSIONS), None)
             
-        if source_path:
-            try:
-                process_pipeline(source_path, whisper_model, start_type, generate_pdf=generate_pdf)
-            except Exception as e:
-                print(f"    [ERROR] Could not process {stem}: {e}")
+            source_path = None
+            start_type = None
+            
+            if video_file:
+                source_path = video_file
+                start_type = "video"
+            elif audio_file:
+                source_path = audio_file
+                start_type = "audio"
+            elif text_file:
+                source_path = text_file
+                start_type = "text"
+                
+            if source_path:
+                try:
+                    process_pipeline(source_path, whisper_model, start_type, generate_pdf=generate_pdf)
+                except Exception as e:
+                    print(f"    [ERROR] Could not process {stem} in {current_dir}: {e}")
 
 
 if __name__ == "__main__":
