@@ -9,6 +9,8 @@ from langchain_ollama import OllamaLLM
 from langchain_core.runnables import RunnableSequence
 
 VIDEO_EXTENSIONS = [".mp4", ".mkv", ".avi", ".mov"]
+AUDIO_EXTENSIONS = [".mp3", ".wav", ".m4a", ".aac"]
+TEXT_EXTENSIONS = [".txt"]
 
 spinner_cycle = ["|", "/", "-", "\\"]
 
@@ -45,67 +47,91 @@ def transcribe_audio(model, audio_file, transcript_file):
         f.write(result["text"])
     return transcript_file
 
-def process_video(video_path, whisper_model, generate_pdf=True, llm_model="gemma3"):
-    base = Path(video_path).stem
-    dir_path = Path(video_path).parent
+def process_pipeline(source_path, whisper_model, start_type, generate_pdf=True, llm_model="gemma3"):
+    base = Path(source_path).stem
+    dir_path = Path(source_path).parent
 
     audio_file = dir_path / f"{base}.mp3"
     transcript_file = dir_path / f"{base}.txt"
     study_file = dir_path / f"{base}_study.md"
     pdf_file = dir_path / f"{base}.pdf"
 
-    print(f"\n{video_path.name}")
+    print(f"\n{source_path.name}")
 
-    steps = ["video"]
+    steps = []
 
-    # Step 1: Extract audio
-    if not audio_file.exists():
-        spinner("    video > ...", subprocess.run,
-                ["ffmpeg", "-i", str(video_path),
-                 "-vn", "-c:a", "libmp3lame", "-q:a", "2",
-                 str(audio_file)], check=True)
-    steps.append("audio")
+    # Step 1: Extract audio (only if starting from video)
+    if start_type == "video":
+        steps.append("video")
+        if not audio_file.exists():
+            spinner(f"    {' > '.join(steps)} > ...", subprocess.run,
+                    ["ffmpeg", "-i", str(source_path),
+                     "-vn", "-c:a", "libmp3lame", "-q:a", "2",
+                     str(audio_file)], check=True)
+        steps.append("audio")
+    elif start_type == "audio":
+        steps.append("audio")
+    elif start_type == "text":
+        steps.append("transcript")
 
-    # Step 2: Transcribe
-    if not transcript_file.exists():
-        spinner("    video > audio > ...", transcribe_audio,
+    # Step 2: Transcribe (if we have audio but no transcript)
+    if not transcript_file.exists() and (start_type in ["video", "audio"] or audio_file.exists()):
+        if "audio" not in steps and audio_file.exists():
+            steps.insert(0, "audio")
+        
+        spinner(f"    {' > '.join(steps)} > ...", transcribe_audio,
                 whisper_model, audio_file, transcript_file)
-    steps.append("transcript")
+    
+    if "transcript" not in steps:
+        steps.append("transcript")
 
-    # Step 3: Study material (directly from transcript)
+    # Step 3: Study material (from transcript)
     if not study_file.exists():
         def study():
             study_prompt = PromptTemplate.from_template(
-                "You are an expert educator creating comprehensive study materials from a lecture transcript. "
-                "Analyze the following transcript and generate well-structured study material in markdown format.\n\n"
-                "Structure your response with these sections:\n\n"
-                "## 1. Overview\n"
-                "Provide a brief 2-3 sentence summary of the main topic.\n\n"
-                "## 2. Key Concepts and Definitions\n"
-                "List and explain the fundamental concepts covered. Use **bold** for key terms.\n\n"
-                "## 3. Detailed Notes\n"
-                "Organize notes with clear headings and subheadings. Use:\n"
-                "- Bullet points for lists\n"
-                "- **Bold** for important terms\n"
-                "- *Italics* for emphasis\n"
-                "- Code blocks for formulas or technical syntax\n\n"
-                "## 4. Glossary\n"
-                "Create a bullet list of important terms with clear explanations:\n"
-                "- **Term**: Definition and context\n\n"
-                "## 5. Practice Questions (25 questions)\n"
-                "Include a mix of question types:\n\n"
-                "### Multiple Choice Questions (15 questions)\n"
-                "Format each as:\n"
-                "**Q1:** Question text?\n"
-                "- A) Option A\n"
-                "- B) Option B\n"
-                "- C) **Option C (Correct)**\n"
-                "- D) Option D\n\n"
-                "### Short Answer Questions (10 questions)\n"
-                "Format each as:\n"
-                "**Q16:** Question text?\n"
-                "*Answer:* Provide the answer here.\n\n"
-                "Transcript:\n{transcript}"
+                "You are an expert educator and instructional designer. Your goal is to transform the following lecture transcript into a comprehensive, high-quality textbook-style learning module.\n\n"
+                "### CRITICAL GUIDELINES:\n"
+                "1. **Subject Matter Focus**: Focus exclusively on the educational content, concepts, and technical details. Do NOT mention the video, the trainer, the recording, or the fact that this is a transcript (e.g., avoid 'In this video', 'The speaker explains').\n"
+                "2. **Comprehensive Depth**: Do not just summarize; expand on the concepts. If a concept is mentioned, explain it thoroughly. Use analogies or examples where helpful to clarify complex points.\n"
+                "3. **Professional Tone**: Maintain a formal, academic, yet engaging tone suitable for a professional study guide.\n"
+                "4. **Formatting**: Use clean Markdown with clear hierarchies. Ensure mathematical formulas or code snippets are in appropriate blocks.\n\n"
+                "### STRUCTURE YOUR RESPONSE WITH THESE SECTIONS:\n\n"
+                "# [Title Based on Subject Matter]\n\n"
+                "## 1. Learning Objectives\n"
+                "List 3-5 clear objectives that a student will achieve after studying this material.\n\n"
+                "## 2. Executive Overview\n"
+                "Provide a detailed 1-2 paragraph summary of the core themes and the importance of the topic.\n\n"
+                "## 3. Core Concepts & Technical Definitions\n"
+                "Identify and define the fundamental building blocks mentioned. Use **bold** for terms and provide clear, concise definitions.\n\n"
+                "## 4. Comprehensive Subject Matter Notes\n"
+                "This is the main body. Organize with logical headings (###) and sub-headings (####). Use:\n"
+                "- Deep dives into specific sub-topics.\n"
+                "- **Analogy/Example Boxes**: Use blockquotes (>) for real-world scenarios or analogies that help explain difficult concepts.\n"
+                "- Bulleted lists for processes or features.\n"
+                "- Code blocks (```) for any technical syntax, commands, or formulas.\n\n"
+                "## 5. Summary & Actionable Takeaways\n"
+                "Synthesize the most important points into a 'Key Takeaways' list. What are the immediate applications of this knowledge?\n\n"
+                "## 6. Glossary of Terms\n"
+                "A comprehensive list of technical terms with expanded definitions and context.\n\n"
+                "## 7. Knowledge Assessment (Bloom's Taxonomy Based)\n"
+                "Provide a robust set of questions to test different levels of understanding:\n\n"
+                "### Part A: Recall & Comprehension (10 MCQs)\n"
+                "Focus on facts and basic concepts.\n"
+                "**Q1:** Question?\n"
+                "- A) Option\n"
+                "- B) Option\n"
+                "- C) **Option (Correct)**\n"
+                "- D) Option\n\n"
+                "### Part B: Application & Analysis (5 Short Answer Questions)\n"
+                "Focus on how to use the knowledge or analyze scenarios.\n"
+                "**Q11:** Scenario/Question text?\n"
+                "*Answer:* Detailed explanation of the application/analysis.\n\n"
+                "### Part C: Synthesis & Evaluation (2 Critical Thinking Challenges)\n"
+                "Ask the student to combine ideas or judge the value of information.\n"
+                "**Q16:** Challenge prompt?\n"
+                "*Answer:* Guidelines for a high-quality response.\n\n"
+                "Transcript content to process:\n"
+                "{transcript}"
             )
             llm = OllamaLLM(model=llm_model)
             study_chain = RunnableSequence(first=study_prompt, last=llm)
@@ -114,8 +140,11 @@ def process_video(video_path, whisper_model, generate_pdf=True, llm_model="gemma
             study_material = study_chain.invoke({"transcript": transcript_text})
             with open(study_file, "w", encoding="utf-8") as f:
                 f.write(study_material)
-        spinner("    video > audio > text > ...", study)
-    steps.append("study guide")
+
+        spinner(f"    {' > '.join(steps)} > ...", study)
+    
+    if "study material" not in steps:
+        steps.append("study material")
 
     # Step 4: PDF
     if generate_pdf:
@@ -134,9 +163,11 @@ def process_video(video_path, whisper_model, generate_pdf=True, llm_model="gemma
                 "--number-sections"
             ]
 
-            spinner("    video > audio > text > markdown > PDF ...", subprocess.run,
+            spinner(f"    {' > '.join(steps)} > PDF ...", subprocess.run,
                     pandoc_command, check=True)
-        steps.append("PDF")
+        
+        if "PDF" not in steps:
+            steps.append("PDF")
 
     # Final pipeline line
     print("    " + " > ".join(steps))
@@ -144,12 +175,37 @@ def process_video(video_path, whisper_model, generate_pdf=True, llm_model="gemma
 
 def process_directory(directory, whisper_model, generate_pdf=True):
     dir_path = Path(directory)
+    
+    # Group files by stem to identify candidates for processing
+    groups = {}
     for file in dir_path.iterdir():
-        if file.suffix.lower() in VIDEO_EXTENSIONS:
+        if file.is_file():
+            groups.setdefault(file.stem, []).append(file)
+            
+    for stem, files in groups.items():
+        # Priority for entry point: Video > Audio > Text
+        video_file = next((f for f in files if f.suffix.lower() in VIDEO_EXTENSIONS), None)
+        audio_file = next((f for f in files if f.suffix.lower() in AUDIO_EXTENSIONS), None)
+        text_file = next((f for f in files if f.suffix.lower() in TEXT_EXTENSIONS), None)
+        
+        source_path = None
+        start_type = None
+        
+        if video_file:
+            source_path = video_file
+            start_type = "video"
+        elif audio_file:
+            source_path = audio_file
+            start_type = "audio"
+        elif text_file:
+            source_path = text_file
+            start_type = "text"
+            
+        if source_path:
             try:
-                process_video(file, whisper_model, generate_pdf=generate_pdf)
+                process_pipeline(source_path, whisper_model, start_type, generate_pdf=generate_pdf)
             except Exception as e:
-                print(f"    [ERROR] Could not process {file.name}: {e}")
+                print(f"    [ERROR] Could not process {stem}: {e}")
 
 
 if __name__ == "__main__":

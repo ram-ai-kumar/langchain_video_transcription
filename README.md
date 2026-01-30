@@ -11,16 +11,17 @@ The result is a system that demonstrates not only technical execution but also t
 
 ## Features
 
-- **Video → Audio Extraction**: Uses `ffmpeg` to isolate audio streams from video files.
-- **Audio → Transcript**: Employs [OpenAI Whisper](https://github.com/openai/whisper) for accurate speech-to-text transcription.
+- **Multi-Source Entry**: Start from **Video**, **Audio**, or **Text** files.
+- **Video → Audio Extraction**: Uses `ffmpeg` to isolate audio streams from video files (skipped if starting from audio).
+- **Audio → Transcript**: Employs [OpenAI Whisper](https://github.com/openai/whisper) for accurate speech-to-text transcription (skipped if starting from text).
 - **Transcript → Summary**: Leverages [LangChain](https://www.langchain.com/) with Ollama LLM models to generate structured summaries with topics, headings, and concepts.
 - **Summary → Study Material**:
   - Key concepts and definitions
   - Bullet-point notes
   - Glossary of important terms
-  - 25 practice questions (MCQ + short answer)
+  - practice questions (MCQ + short answer + Critical Thinking)
 - **Markdown → PDF**: Converts study material into polished PDFs using Pandoc + LaTeX.
-- **CLI Experience**: Clean, readable, single-line progress updates with spinners for in-progress stages.
+- **CLI Experience**: Clean, readable progress updates with dynamic pipeline paths and spinners.
 
 ---
 
@@ -37,11 +38,11 @@ The result is a system that demonstrates not only technical execution but also t
 
 ---
 
-## Orchestration
+The pipeline is designed as an **intelligent, modular sequence of transformations**. It automatically detects the best starting point for each filename:
 
-The pipeline is designed as a **modular sequence of transformations**:
-
-video → audio → transcript → summary → study material → PDF
+- **Video Entry**: `video > audio > transcript > study material > PDF`
+- **Audio Entry**: `audio > transcript > study material > PDF`
+- **Text Entry**: `transcript > study material > PDF`
 
 Each stage:
 
@@ -67,15 +68,22 @@ This orchestration ensures **idempotency, scalability, and clarity** — critica
 
 ## Example CLI Output
 
-_Each stage shows a rotating line as progress bar and ellipsis to denote in-progress_
+_The script dynamically shows the pipeline based on the source type:_
 
 ```bash
 AI is warming up... ready to crunch some knowledge.
 
+# Starting from Video
 myVideo.mp4
-    video > ... |
-    video > audio > ... /
-    video > audio > text > markdown > study > PDF
+    video > audio > transcript > study material > PDF
+
+# Starting from Audio (no video exists)
+lecture.mp3
+    audio > transcript > study material > PDF
+
+# Starting from Text (no video or audio exists)
+notes.txt
+    transcript > study material > PDF
 ```
 
 ---
@@ -91,5 +99,5 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-python langchain_videos_transcription.py ./videos --pdf
+python video_transcribe.py ./data
 ```
