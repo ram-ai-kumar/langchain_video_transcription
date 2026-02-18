@@ -267,12 +267,20 @@ def process_directory(directory, whisper_model, generate_pdf=True):
     dir_path = Path(directory)
     
     # Traverse through all subdirectories using os.walk so the user can point
-    # the tool at a single top‑level content root.
+    # the tool at a single top‑level content root. We sort directory names
+    # case‑insensitively so that folders are visited in chronological/
+    # lexicographic name order by their name.
     for root, dirs, _ in os.walk(dir_path):
+        dirs.sort(key=lambda d: d.lower())
         current_dir = Path(root)
         
-        # Collect all files in this directory
-        all_files = [f for f in current_dir.iterdir() if f.is_file()]
+        # Collect and sort all files in this directory by name (case‑insensitive)
+        # so that per‑folder processing also follows chronological/lexicographic
+        # order of their name.
+        all_files = sorted(
+            [f for f in current_dir.iterdir() if f.is_file()],
+            key=lambda f: f.name.lower(),
+        )
         if not all_files:
             continue
 
@@ -288,8 +296,11 @@ def process_directory(directory, whisper_model, generate_pdf=True):
         )
 
         if has_processable:
-            # Standard processing: Video > Audio > Text priority per stem group
-            for stem, files in groups.items():
+            # Standard processing: Video > Audio > Text priority per stem group.
+            # Iterate stems in sorted (case‑insensitive) order so logical items
+            # are handled chronologically by their base name.
+            for stem in sorted(groups.keys(), key=lambda s: s.lower()):
+                files = groups[stem]
                 video_file = next((f for f in files if f.suffix.lower() in VIDEO_EXTENSIONS), None)
                 audio_file = next((f for f in files if f.suffix.lower() in AUDIO_EXTENSIONS), None)
                 text_file = next((f for f in files if f.suffix.lower() in TEXT_EXTENSIONS), None)
@@ -318,7 +329,7 @@ def process_directory(directory, whisper_model, generate_pdf=True):
             # through the normal text pipeline.
             image_files = sorted(
                 [f for f in all_files if f.suffix.lower() in IMAGE_EXTENSIONS],
-                key=lambda f: f.name
+                key=lambda f: f.name.lower()
             )
             if image_files:
                 # Use the folder name as the base name for the text file

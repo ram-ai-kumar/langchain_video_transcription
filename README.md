@@ -12,15 +12,19 @@ The result is a system that demonstrates not only technical execution but also t
 ## Features
 
 - **Recursive Processing**: Scans the entire directory subtree and processes files in every folder.
+- **Deterministic Ordering**: Visits folders, files, and filename groups in **chronological/lexicographic ascending order by name** (case-insensitive) so runs are repeatable and easy to reason about.
 - **Multi-Source Entry**: Start from **Video**, **Audio**, or **Text** files.
 - **Video → Audio Extraction**: Uses `ffmpeg` to isolate audio streams from video files (skipped if starting from audio).
 - **Audio → Transcript**: Employs [OpenAI Whisper](https://github.com/openai/whisper) for accurate speech-to-text transcription (skipped if starting from text).
-- **Transcript → Summary**: Leverages [LangChain](https://www.langchain.com/) with Ollama LLM models to generate structured summaries with topics, headings, and concepts.
-- **Summary → Study Material**:
-  - Key concepts and definitions
-  - Bullet-point notes
+- **Transcript → Study Chapter**: Leverages [LangChain](https://www.langchain.com/) with Ollama LLM models to generate a **standalone textbook-style chapter** (not just a summary) based on the discovered topics.
+- **Rich Study Material Structure**:
+  - Learning objectives
+  - Executive overview
+  - Core concepts and precise definitions
+  - In-depth coverage with best practices and pitfalls
   - Glossary of important terms
-  - practice questions (MCQ + short answer + Critical Thinking)
+  - Practice questions (MCQ, short answer, and critical thinking)
+- **Image-Only Folders → OCR → Study Pipeline**: If a folder only contains images (e.g., slide decks or scanned pages), the script OCRs them into a single transcript and then feeds that into the same study-material + PDF pipeline.
 - **Markdown → PDF**: Converts study material into polished PDFs using Pandoc + LaTeX.
 - **CLI Experience**: Clean, readable progress updates with dynamic pipeline paths and spinners.
 
@@ -101,4 +105,7 @@ pip install -r requirements.txt
 
 ```bash
 python video_transcribe.py ./data
+
+# If you only want the Markdown study files and wish to skip PDF generation:
+python video_transcribe.py ./data --no-pdf
 ```
