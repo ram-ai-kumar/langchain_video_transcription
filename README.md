@@ -93,19 +93,78 @@ notes.txt
 
 ---
 
-## Installation
+## Prerequisites
 
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+- **Python**: 3.11 or newer
+- **ffmpeg**: for video → audio extraction  
+  - macOS: `brew install ffmpeg`  
+  - Ubuntu/Debian: `sudo apt-get install ffmpeg`
+- **Tesseract OCR**: for image-only folders  
+  - macOS: `brew install tesseract`  
+  - Ubuntu/Debian: `sudo apt-get install tesseract-ocr`
+- **Pandoc + LaTeX** (only if you want PDFs)  
+  - macOS: `brew install pandoc mactex` (or any full LaTeX distro)  
+  - Ubuntu/Debian: `sudo apt-get install pandoc texlive-latex-recommended`
+- **Ollama** with an LLM model (defaults to `gemma3`)  
+  - Install Ollama from their website  
+  - Pull a model, for example: `ollama pull gemma3`
 
-## Usage
+---
 
-```bash
-python video_transcribe.py ./data
+## Step-by-step setup
 
-# If you only want the Markdown study files and wish to skip PDF generation:
-python video_transcribe.py ./data --no-pdf
-```
+1. **Clone the repository**
+   ```bash
+   git clone <this-repo-url> video_transcription
+   cd video_transcription
+   ```
+2. **Create and activate a virtual environment**
+   ```bash
+   python3.11 -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   ```
+3. **Install Python dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. **Install system tools** (if not already installed)
+   - Install `ffmpeg`, `tesseract`, and `pandoc` + a LaTeX distribution using the commands in the **Prerequisites** section.
+5. **Prepare Ollama**
+   - Install Ollama and start the Ollama service.
+   - Pull the model the script uses (default is `gemma3`):
+     ```bash
+     ollama pull gemma3
+     ```
+
+---
+
+## How to run the pipeline
+
+1. **Organize your content**
+   - Create a folder such as `./data` and place your media inside it.
+   - You can mix:
+     - Video files (`.mp4`, `.mkv`, `.avi`, `.mov`)
+     - Audio files (`.mp3`, `.wav`, `.m4a`, `.aac`)
+     - Text transcripts (`.txt`)
+     - Image folders (slides/scans as `.png`, `.jpg`, etc.)
+   - Subfolders are allowed; the script recursively walks the entire directory tree.
+
+2. **Run the script**
+   ```bash
+   # From the project root, with the virtualenv activated:
+   python video_transcribe.py ./data
+   ```
+
+3. **Optional: skip PDF generation**
+   ```bash
+   python video_transcribe.py ./data --no-pdf
+   ```
+
+4. **Inspect outputs**
+   - For each logical item, you will find:
+     - A transcript: `<name>.txt`
+     - A study guide (Markdown): `<name>_study.md`
+     - A PDF (if enabled and Pandoc/LaTeX are installed): `<name>.pdf`
+
+5. **Re-running is safe**
+   - The pipeline is **idempotent**: existing artifacts are reused, and only missing pieces are generated.
