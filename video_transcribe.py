@@ -1,3 +1,11 @@
+"""End‑to‑end pipeline for turning videos, audio, text files, or image folders
+into Markdown study material and optionally a PDF textbook‑style handout.
+
+This script is designed to be run on a directory tree; it discovers media,
+transcribes or OCRs it, generates an LLM‑authored study guide, and (optionally)
+converts the result to a nicely formatted PDF via Pandoc/LaTeX.
+"""
+
 import os
 import sys
 import subprocess
@@ -19,8 +27,10 @@ spinner_cycle = ["|", "/", "-", "\\"]
 
 def spinner(prefix, run_func, *args, **kwargs):
     """
-    Show spinner while running a function or subprocess.
-    Updates the same line in place.
+    Show a lightweight CLI spinner while running a function or subprocess.
+
+    The spinner runs in the main thread while `run_func` executes in a worker
+    thread, and continuously rewrites the same console line for a clean UX.
     """
     done = False
     result = None
@@ -67,12 +77,30 @@ def extract_text_from_images(image_files, output_file):
 
 
 def transcribe_audio(model, audio_file, transcript_file):
+    """
+    Transcribe a single audio file with a Whisper model and write plain text.
+
+    Only the final concatenated transcript text is persisted; segment metadata
+    from Whisper is intentionally discarded to keep downstream processing simple.
+    """
     result = model.transcribe(str(audio_file), language="en", verbose=True)
     with open(transcript_file, "w", encoding="utf-8") as f:
         f.write(result["text"])
     return transcript_file
 
 def process_pipeline(source_path, whisper_model, start_type, generate_pdf=True, llm_model="gemma3"):
+    """
+    Run the full processing pipeline for a single logical source (video/audio/text/images).
+
+    - Derives standard output filenames (audio, transcript, study markdown, PDF)
+      from the `source_path` stem.
+    - Uses `start_type` to decide which stages are required:
+      * ``video``  → extract audio → transcribe → study material → optional PDF
+      * ``audio``  → transcribe → study material → optional PDF
+      * ``text``   → study material → optional PDF
+      * ``images`` → OCR to text → study material → optional PDF
+    - Tracks a human‑readable list of steps for consistent status messages.
+    """
     base = Path(source_path).stem
     dir_path = Path(source_path).parent
 
@@ -102,7 +130,9 @@ def process_pipeline(source_path, whisper_model, start_type, generate_pdf=True, 
         steps.append("images")
         steps.append("transcript")
 
-    # Step 2: Transcribe (if we have audio but no transcript)
+    # Step 2: Transcribe (if we have audio but no transcript).
+    # This also covers the case where a transcript was deleted/re‑generated
+    # while a compatible audio file is still present.
     if not transcript_file.exists() and (start_type in ["video", "audio"] or audio_file.exists()):
         if "audio" not in steps and audio_file.exists():
             steps.insert(0, "audio")
@@ -116,6 +146,8 @@ def process_pipeline(source_path, whisper_model, start_type, generate_pdf=True, 
     # Step 3: Study material (from transcript)
     if not study_file.exists():
         def study():
+            # Large, single PromptTemplate that tells the LLM to ignore lecture
+            # structure and instead author a standalone textbook‑style chapter.
             study_prompt = PromptTemplate.from_template(
                 "You are a world-class domain expert and textbook author. A transcript from a lecture is provided below.\n\n"
                 "### YOUR TASK (Two Phases):\n\n"
@@ -182,6 +214,8 @@ def process_pipeline(source_path, whisper_model, start_type, generate_pdf=True, 
                 "Transcript (for topic identification only):\n"
                 "{transcript}"
             )
+            # The LLM model is provided via Ollama; switching models only
+            # requires changing the `llm_model` string.
             llm = OllamaLLM(model=llm_model)
             study_chain = RunnableSequence(first=study_prompt, last=llm)
             with open(transcript_file, "r", encoding="utf-8") as f:
@@ -195,7 +229,7 @@ def process_pipeline(source_path, whisper_model, start_type, generate_pdf=True, 
     if "study material" not in steps:
         steps.append("study material")
 
-    # Step 4: PDF
+    # Step 4: PDF (optional)
     if generate_pdf:
         if not pdf_file.exists():
             # Path to the LaTeX header file
@@ -223,9 +257,17 @@ def process_pipeline(source_path, whisper_model, start_type, generate_pdf=True, 
 
 
 def process_directory(directory, whisper_model, generate_pdf=True):
+    """
+    Walk a directory tree and run `process_pipeline` for each logical source.
+
+    Grouping is done by filename stem within each folder so that, for example,
+    ``lecture1.mp4`` and ``lecture1.mp3`` are treated as the same logical item
+    with a clear precedence order (video > audio > existing text).
+    """
     dir_path = Path(directory)
     
-    # Traverse through all subdirectories using os.walk
+    # Traverse through all subdirectories using os.walk so the user can point
+    # the tool at a single top‑level content root.
     for root, dirs, _ in os.walk(dir_path):
         current_dir = Path(root)
         
@@ -271,7 +313,9 @@ def process_directory(directory, whisper_model, generate_pdf=True):
                     except Exception as e:
                         print(f"    [ERROR] Could not process {stem} in {current_dir}: {e}")
         else:
-            # Check for image-only folder: extract text from images
+            # Fallback for image‑only folders: treat them as slide decks or
+            # scanned pages and build a transcript via OCR before piping them
+            # through the normal text pipeline.
             image_files = sorted(
                 [f for f in all_files if f.suffix.lower() in IMAGE_EXTENSIONS],
                 key=lambda f: f.name
@@ -302,6 +346,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-pdf", action="store_true", help="Skip PDF generation (PDF generated by default)")
     args = parser.parse_args()
 
+    # CLI entry point: load Whisper once, then process the entire directory tree.
     print("AI is warming up... ready to crunch some knowledge.")
 
     whisper_model = whisper.load_model("medium")
