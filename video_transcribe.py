@@ -34,10 +34,14 @@ def spinner(prefix, run_func, *args, **kwargs):
     """
     done = False
     result = None
+    exception = None
 
     def target():
-        nonlocal result
-        result = run_func(*args, **kwargs)
+        nonlocal result, exception
+        try:
+            result = run_func(*args, **kwargs)
+        except Exception as e:
+            exception = e
 
     import threading
     t = threading.Thread(target=target)
@@ -52,6 +56,9 @@ def spinner(prefix, run_func, *args, **kwargs):
     t.join()
     sys.stdout.write(f"\r{prefix}\n")
     sys.stdout.flush()
+    
+    if exception:
+        raise exception
     return result
 
 def extract_text_from_images(image_files, output_file):
@@ -234,20 +241,137 @@ def process_pipeline(source_path, whisper_model, start_type, generate_pdf=True, 
         if not pdf_file.exists():
             # Path to the LaTeX header file
             header_file = Path(__file__).parent / "header.tex"
+            
+            # Check if header file exists
+            if not header_file.exists():
+                print(f"    [WARN] Header file not found: {header_file}")
+                return
 
-            pandoc_command = [
-                "pandoc", str(study_file),
-                "-o", str(pdf_file),
-                "--pdf-engine=pdflatex",
-                f"--include-in-header={str(header_file)}",
-                "--variable", "fontsize=12pt",
-                "--toc",  # Table of contents
-                "--toc-depth=3",
-                "--number-sections"
-            ]
+            # Try XeLaTeX first for better Unicode support, fallback to pdfLaTeX
+            engines = ["xelatex", "pdflatex"]
+            
+            for engine in engines:
+                try:
+                    if engine == "xelatex":
+                        print(f"    [INFO] Trying XeLaTeX for better Unicode support...")
+                        pandoc_command = [
+                            "pandoc", str(study_file),
+                            "-o", str(pdf_file),
+                            "--pdf-engine=xelatex",
+                            f"--include-in-header={str(header_file)}",
+                            "--variable", "fontsize=12pt",
+                            "--toc",  # Table of contents
+                            "--toc-depth=3",
+                            "--number-sections",
+                            "--fail-if-warnings=false",  # Continue on non-critical warnings
+                            "--log=INFO",  # Reduce verbosity
+                            "--pdf-engine-opt=-interaction=nonstopmode",  # Don't stop on errors
+                            "--pdf-engine-opt=-shell-escape",  # Allow shell escape if needed
+                        ]
+                    else:
+                        print(f"    [INFO] Falling back to pdfLaTeX...")
+                        pandoc_command = [
+                            "pandoc", str(study_file),
+                            "-o", str(pdf_file),
+                            "--pdf-engine=pdflatex",
+                            f"--include-in-header={str(header_file)}",
+                            "--variable", "fontsize=12pt",
+                            "--toc",  # Table of contents
+                            "--toc-depth=3",
+                            "--number-sections",
+                            "--fail-if-warnings=false",  # Continue on non-critical warnings
+                            "--log=INFO",  # Reduce verbosity
+                            "--pdf-engine-opt=-interaction=nonstopmode",  # Don't stop on errors
+                            "--pdf-engine-opt=-shell-escape",  # Allow shell escape if needed
+                        ]
 
-            spinner(f"    {' > '.join(steps)} > PDF ...", subprocess.run,
-                    pandoc_command, check=True)
+                    spinner(f"    {' > '.join(steps)} > PDF ({engine}) ...", subprocess.run,
+                            pandoc_command, check=True, capture_output=True, text=True)
+                    print(f"    [SUCCESS] PDF generation succeeded with {engine}")
+                    break  # Success, exit the engine loop
+                    
+                except subprocess.CalledProcessError as e:
+                    print(f"    [ERROR] PDF generation failed with {engine} for {study_file.name}")
+                    print(f"    [ERROR] Pandoc exit code: {e.returncode}")
+                    
+                    # Extract error messages
+                    error_output = ""
+                    if e.stderr:
+                        error_output = str(e.stderr)
+                    elif e.stdout:
+                        error_output = str(e.stdout)
+                    
+                    # Provide helpful error messages based on common issues
+                    if error_output:
+                        if "Permission denied" in error_output:
+                            print(f"    [ERROR] Permission denied - check write permissions for {pdf_file.parent}")
+                        elif "No such file" in error_output or "cannot find" in error_output.lower():
+                            print(f"    [ERROR] Missing file or directory - check paths")
+                            print(f"    [ERROR] Input file: {study_file}")
+                            print(f"    [ERROR] Output file: {pdf_file}")
+                        elif "Undefined control sequence" in error_output:
+                            print(f"    [ERROR] LaTeX syntax error in markdown file")
+                            # Show the problematic line if available
+                            lines = error_output.split('\n')
+                            for line in lines:
+                                if "Undefined control sequence" in line:
+                                    print(f"    [ERROR] {line[:150]}")
+                        elif "LaTeX Error" in error_output or "Unicode character" in error_output:
+                            print(f"    [ERROR] LaTeX compilation error detected")
+                            # Show first few error lines
+                            error_lines = [l for l in error_output.split('\n') if 'Error' in l or 'Fatal' in l or 'Unicode' in l][:3]
+                            for line in error_lines:
+                                print(f"    [ERROR] {line[:150]}")
+                        else:
+                            # Show last 500 chars of error output for debugging
+                            print(f"    [ERROR] Error details: {error_output[-500:]}")
+                    
+                    # Common Pandoc exit codes
+                    if e.returncode == 6:
+                        print(f"    [ERROR] LaTeX compilation failed (exit code 6)")
+                        print(f"    [INFO] This often indicates LaTeX syntax errors or missing packages")
+                    elif e.returncode == 43:
+                        print(f"    [ERROR] LaTeX compilation error - possibly special characters in content")
+                    
+                    # If this was the last engine, try simple fallback
+                    if engine == engines[-1]:
+                        print(f"    [INFO] All engines failed, trying minimal PDF generation...")
+                        try:
+                            fallback_command = [
+                                "pandoc", str(study_file),
+                                "-o", str(pdf_file),
+                                "--pdf-engine=pdflatex",
+                                "--variable", "fontsize=12pt",
+                                "--fail-if-warnings=false",
+                                "--pdf-engine-opt=-interaction=nonstopmode"
+                            ]
+                            spinner(f"    {' > '.join(steps)} > PDF (minimal) ...", subprocess.run,
+                                    fallback_command, check=True, capture_output=True, text=True)
+                            print(f"    [SUCCESS] Minimal PDF generation succeeded")
+                        except subprocess.CalledProcessError as fallback_error:
+                            print(f"    [ERROR] Minimal PDF generation also failed (exit code: {fallback_error.returncode})")
+                            if fallback_error.stderr:
+                                print(f"    [ERROR] Minimal fallback error: {str(fallback_error.stderr)[-300:]}")
+                            print(f"    [INFO] Continuing without PDF generation...")
+                            if "PDF" not in steps:
+                                steps.append("PDF (failed)")
+                        except Exception as fallback_exception:
+                            print(f"    [ERROR] Unexpected error in minimal fallback: {fallback_exception}")
+                            print(f"    [INFO] Continuing without PDF generation...")
+                            if "PDF" not in steps:
+                                steps.append("PDF (failed)")
+                    else:
+                        # Try next engine
+                        continue
+                        
+                except Exception as e:
+                    print(f"    [ERROR] Unexpected error during PDF generation with {engine}: {e}")
+                    if engine == engines[-1]:  # Last engine
+                        print(f"    [INFO] Continuing without PDF generation...")
+                        if "PDF" not in steps:
+                            steps.append("PDF (failed)")
+                    else:
+                        continue
         
         if "PDF" not in steps:
             steps.append("PDF")
@@ -260,9 +384,17 @@ def process_directory(directory, whisper_model, generate_pdf=True):
     """
     Walk a directory tree and run `process_pipeline` for each logical source.
 
+    Processing happens in three passes:
+    1. Video/audio/text groups: Processed by stem with priority (video > audio > text)
+    2. Image groups: Processed by stem, including those sharing stems with other media
+    3. Loose images: Images without matching stems grouped by folder name
+    
+    Images sharing a stem with video/audio/text use `{stem}_images.txt` naming
+    to avoid conflicts. Images with unique stems use `{stem}.txt`.
+    
     Grouping is done by filename stem within each folder so that, for example,
-    ``lecture1.mp4`` and ``lecture1.mp3`` are treated as the same logical item
-    with a clear precedence order (video > audio > existing text).
+    ``lecture1.mp4`` and ``lecture1.mp3`` are treated as the same logical item,
+    while ``lecture1.mp4`` and ``lecture1.png`` produce separate transcripts.
     """
     dir_path = Path(directory)
     
@@ -284,70 +416,86 @@ def process_directory(directory, whisper_model, generate_pdf=True):
         if not all_files:
             continue
 
-        # Group files by stem for video/audio/text processing
+        # Group files by stem for all media types including images
         groups = {}
         for file in all_files:
             groups.setdefault(file.stem, []).append(file)
 
-        # Check if this folder has processable sources (video/audio/text)
-        has_processable = any(
-            any(f.suffix.lower() in VIDEO_EXTENSIONS + AUDIO_EXTENSIONS + TEXT_EXTENSIONS for f in files)
-            for files in groups.values()
-        )
-
-        if has_processable:
-            # Standard processing: Video > Audio > Text priority per stem group.
-            # Iterate stems in sorted (case‑insensitive) order so logical items
-            # are handled chronologically by their base name.
-            for stem in sorted(groups.keys(), key=lambda s: s.lower()):
-                files = groups[stem]
-                video_file = next((f for f in files if f.suffix.lower() in VIDEO_EXTENSIONS), None)
-                audio_file = next((f for f in files if f.suffix.lower() in AUDIO_EXTENSIONS), None)
-                text_file = next((f for f in files if f.suffix.lower() in TEXT_EXTENSIONS), None)
-                
-                source_path = None
-                start_type = None
-                
-                if video_file:
-                    source_path = video_file
-                    start_type = "video"
-                elif audio_file:
-                    source_path = audio_file
-                    start_type = "audio"
-                elif text_file:
-                    source_path = text_file
-                    start_type = "text"
-                    
-                if source_path:
-                    try:
-                        process_pipeline(source_path, whisper_model, start_type, generate_pdf=generate_pdf)
-                    except Exception as e:
-                        print(f"    [ERROR] Could not process {stem} in {current_dir}: {e}")
-        else:
-            # Fallback for image‑only folders: treat them as slide decks or
-            # scanned pages and build a transcript via OCR before piping them
-            # through the normal text pipeline.
-            image_files = sorted(
-                [f for f in all_files if f.suffix.lower() in IMAGE_EXTENSIONS],
-                key=lambda f: f.name.lower()
-            )
-            if image_files:
-                # Use the folder name as the base name for the text file
-                folder_name = current_dir.name
-                transcript_file = current_dir / f"{folder_name}.txt"
-                
-                if not transcript_file.exists():
-                    print(f"\n  [OCR] {folder_name}/ ({len(image_files)} images)")
-                    spinner(
-                        f"    images ({len(image_files)}) > transcript ...",
-                        extract_text_from_images, image_files, transcript_file
-                    )
-                
-                # Now process the generated text file through the pipeline
+        # Track which stems have been processed (for conflict detection)
+        processed_stems = set()
+        
+        # First pass: Process video/audio/text groups (priority: video > audio > text)
+        for stem in sorted(groups.keys(), key=lambda s: s.lower()):
+            files = groups[stem]
+            video_file = next((f for f in files if f.suffix.lower() in VIDEO_EXTENSIONS), None)
+            audio_file = next((f for f in files if f.suffix.lower() in AUDIO_EXTENSIONS), None)
+            text_file = next((f for f in files if f.suffix.lower() in TEXT_EXTENSIONS), None)
+            
+            source_path = None
+            start_type = None
+            
+            if video_file:
+                source_path = video_file
+                start_type = "video"
+            elif audio_file:
+                source_path = audio_file
+                start_type = "audio"
+            elif text_file:
+                source_path = text_file
+                start_type = "text"
+            
+            if source_path:
                 try:
-                    process_pipeline(transcript_file, whisper_model, "images", generate_pdf=generate_pdf)
+                    process_pipeline(source_path, whisper_model, start_type, generate_pdf=generate_pdf)
+                    processed_stems.add(stem)
                 except Exception as e:
-                    print(f"    [ERROR] Could not process images in {current_dir}: {e}")
+                    print(f"    [ERROR] Could not process {stem} in {current_dir}: {e}")
+
+        # Second pass: Process image groups (including those sharing stems with processed media)
+        for stem in sorted(groups.keys(), key=lambda s: s.lower()):
+            files = groups[stem]
+            image_files = [f for f in files if f.suffix.lower() in IMAGE_EXTENSIONS]
+            
+            if image_files:
+                # Determine transcript filename: use _images suffix if stem conflicts with processed media
+                if stem in processed_stems:
+                    transcript_file = current_dir / f"{stem}_images.txt"
+                else:
+                    transcript_file = current_dir / f"{stem}.txt"
+                
+                try:
+                    if not transcript_file.exists():
+                        print(f"\n  [OCR] {stem}/ ({len(image_files)} images)")
+                        spinner(
+                            f"    images ({len(image_files)}) > transcript ...",
+                            extract_text_from_images, image_files, transcript_file
+                        )
+                    process_pipeline(transcript_file, whisper_model, "images", generate_pdf=generate_pdf)
+                    processed_stems.add(stem)
+                except Exception as e:
+                    print(f"    [ERROR] Could not process images for {stem} in {current_dir}: {e}")
+
+        # Third pass: Process remaining loose images (those not matching any stem group)
+        all_image_files = [f for f in all_files if f.suffix.lower() in IMAGE_EXTENSIONS]
+        unprocessed_images = [f for f in all_image_files if f.stem not in processed_stems]
+        
+        if unprocessed_images:
+            # Use the folder name as the base name for the text file
+            folder_name = current_dir.name
+            transcript_file = current_dir / f"{folder_name}_images.txt"
+            
+            if not transcript_file.exists():
+                print(f"\n  [OCR] {folder_name}/ ({len(unprocessed_images)} loose images)")
+                spinner(
+                    f"    images ({len(unprocessed_images)}) > transcript ...",
+                    extract_text_from_images, unprocessed_images, transcript_file
+                )
+            
+            # Now process the generated text file through the pipeline
+            try:
+                process_pipeline(transcript_file, whisper_model, "images", generate_pdf=generate_pdf)
+            except Exception as e:
+                print(f"    [ERROR] Could not process loose images in {current_dir}: {e}")
 
 
 if __name__ == "__main__":

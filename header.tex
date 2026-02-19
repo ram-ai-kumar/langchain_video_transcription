@@ -1,9 +1,10 @@
 % Page geometry with standard margins
 \usepackage[a4paper,top=2.5cm,bottom=2.5cm,left=2.5cm,right=2.5cm]{geometry}
 
-% Font and typography
+% Font and typography with Unicode support
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
+\usepackage{textcomp}  % Additional text symbols
 
 % Use modern, readable font with clear bold and italic distinction
 % \usepackage{libertinus}  % Libertinus for a modern serif look
@@ -11,6 +12,28 @@
 \usepackage{charter}  % Charter - clean and readable
 % \usepackage{ebgaramond}  % EB Garamond - elegant serif
 % \usepackage{lato}  % Lato - modern sans-serif
+
+% Enhanced Unicode support for Greek letters and special characters
+\usepackage{amsmath,amssymb}  % Math symbols including Greek letters
+\usepackage{gensymb}  % Additional symbols
+\usepackage{mathrsfs}  % Math script fonts
+
+% Alternative Unicode handling for problematic characters
+\DeclareUnicodeCharacter{03C3}{\sigma}  % Greek sigma
+\DeclareUnicodeCharacter{03C4}{\tau}   % Greek tau
+\DeclareUnicodeCharacter{03B1}{\alpha} % Greek alpha
+\DeclareUnicodeCharacter{03B2}{\beta}  % Greek beta
+\DeclareUnicodeCharacter{03B3}{\gamma} % Greek gamma
+\DeclareUnicodeCharacter{03B4}{\delta} % Greek delta
+\DeclareUnicodeCharacter{03B5}{\epsilon} % Greek epsilon
+\DeclareUnicodeCharacter{03B8}{\theta} % Greek theta
+\DeclareUnicodeCharacter{03BB}{\lambda} % Greek lambda
+\DeclareUnicodeCharacter{03BC}{\mu} % Greek mu
+\DeclareUnicodeCharacter{03C0}{\pi} % Greek pi
+\DeclareUnicodeCharacter{03C1}{\rho} % Greek rho
+\DeclareUnicodeCharacter{03C6}{\phi} % Greek phi
+\DeclareUnicodeCharacter{03C8}{\psi} % Greek psi
+\DeclareUnicodeCharacter{03C9}{\omega} % Greek omega
 
 \usepackage{microtype}  % Improves typography
 
