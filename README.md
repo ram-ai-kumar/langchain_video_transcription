@@ -3,9 +3,42 @@
 ## Overview
 
 This project began as a simple experiment: transcribing and understanding a few educational videos.  
-It quickly evolved into a **fully automated pipeline** that transforms raw media content into **rich learning material** — complete with transcripts, structured summaries, glossaries, and practice questions — all orchestrated seamlessly.
+It evolved into a **fully automated object-oriented pipeline** that transforms raw media content into **rich learning material** — complete with transcripts, structured summaries, glossaries, and practice questions — all orchestrated seamlessly.
 
-The result is a system that demonstrates not only technical execution but also the **architectural thinking** required to design scalable, reliable, and extensible solutions for **mixed media processing**.
+The result is a system that demonstrates not only technical execution but also the **architectural thinking** required to design scalable, reliable, and extensible solutions for **mixed media processing** using modern software engineering principles.
+
+---
+
+## Architecture Highlights
+
+### **Object-Oriented Design (v2.0)**
+
+The project has been completely refactored into a modular, object-oriented architecture with:
+
+- **Separation of Concerns**: Each component has a single, well-defined responsibility
+- **Strategy Pattern**: Pluggable processors for different media types
+- **Factory Pattern**: Dynamic processor creation based on file types
+- **Observer Pattern**: Progress reporting and UI updates
+- **Command Pattern**: Encapsulated processing operations
+
+### **Core Components**
+
+```text
+src/
+├── core/           # Pipeline orchestration, configuration, exceptions
+├── processors/     # Media processors (audio, image, text, LLM)
+├── generators/     # Output generators (PDF, study materials)
+├── utils/          # File operations, UI, media utilities
+└── cli/            # Command-line interface with signal handling
+```
+
+### **Design Benefits**
+
+- **Maintainability**: Clean separation makes bugs easy to locate and fix
+- **Extensibility**: Add new media types by implementing `BaseProcessor`
+- **Testability**: Each component can be tested independently
+- **Reusability**: Components can be used in other applications
+- **Configuration-Driven**: Flexible behavior through configuration objects
 
 ---
 
@@ -234,7 +267,7 @@ random.gif (loose image)
    - The pipeline is **idempotent**: existing artifacts are reused, and only missing pieces are generated.
    - Mixed media processing is deterministic and conflict-free.
 
----
+   ---
 
 ## Advanced Features
 
@@ -265,10 +298,95 @@ random.gif (loose image)
 
 ### **Study Prompt (`study_prompt.txt`)**
 
-The AI's personality, output structure, and generation rules are defined in `study_prompt.txt`. You can modify this file to:
+The AI's personality, output structure, and generation rules are defined in `config/study_prompt.txt`. You can modify this file to:
 - Change the tone of the generated textbook chapter.
 - Add or remove sections from the study material.
 - Update the "Bloom's Taxonomy" based question requirements.
 - Change the formatting or language requirements.
 
 The script expects a `{transcript}` placeholder at the end of the file where the source text will be injected.
+
+---
+
+## Usage (v2.0 - Object-Oriented)
+
+### **Basic Usage**
+
+```bash
+# Process with default settings
+python main.py /path/to/media/folder
+
+# Skip PDF generation
+python main.py /path/to/media/folder --no-pdf
+
+# Show detailed progress
+python main.py /path/to/media/folder --verbose
+
+# Use different models
+python main.py /path/to/media/folder --whisper-model large --llm-model llama2
+```
+
+### **Advanced Options**
+
+```bash
+# Specify output directory
+python main.py /path/to/media/folder --output-dir /output/path
+
+# Check dependencies
+python main.py /path/to/media/folder --check-deps
+
+# Validate files without processing
+python main.py /path/to/media/folder --validate-only
+
+# Use configuration file
+python main.py /path/to/media/folder --config config.json
+```
+
+### **Configuration File Support**
+
+Create a JSON configuration file for complex setups:
+
+```json
+{
+  "whisper_model": "large",
+  "llm_model": "llama2",
+  "generate_pdf": true,
+  "verbose": true,
+  "output_dir": "/custom/output"
+}
+```
+
+---
+
+## Migration from v1.0 (Script) to v2.0 (OO)
+
+### **What Changed**
+
+1. **Entry Point**: `python video_transcribe.py` → `python main.py`
+2. **Configuration**: Command-line arguments now use modern CLI patterns
+3. **Architecture**: Modular object-oriented design replaces monolithic script
+4. **Error Handling**: Structured exception hierarchy with detailed error messages
+5. **Testing**: Each component can be tested independently
+
+### **Migration Steps**
+
+1. **Update your workflow**:
+   ```bash
+   # Old
+   python video_transcribe.py /path/to/media --no-pdf
+   
+   # New
+   python main.py /path/to/media --no-pdf
+   ```
+
+2. **Configuration files**: Move any custom `study_prompt.txt` to `config/` directory
+
+3. **Custom processors**: Extend `BaseProcessor` class instead of adding functions
+
+### **Backward Compatibility**
+
+The new OO implementation maintains full backward compatibility:
+- Same input/output file formats
+- Same processing logic and quality
+- Same configuration options (with improved CLI)
+- Same generated study material structure
