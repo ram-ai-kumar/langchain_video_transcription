@@ -11,6 +11,7 @@ import sys
 import subprocess
 import time
 from pathlib import Path
+import signal
 import whisper
 import pytesseract
 from PIL import Image
@@ -452,4 +453,11 @@ if __name__ == "__main__":
 
     whisper_model = whisper.load_model("medium")
 
-    process_directory(args.directory, whisper_model, generate_pdf=not args.no_pdf)
+    try:
+        process_directory(args.directory, whisper_model, generate_pdf=not args.no_pdf)
+    except KeyboardInterrupt:
+        # Ignore subsequent Ctrl-C signals during shutdown message
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        # Print message in red (\033[31m) and reset (\033[0m)
+        print("\n\n\033[31m[INFO] Interrupted by user. Cleaning up and exiting...\033[0m")
+        sys.exit(0)
