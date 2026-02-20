@@ -153,74 +153,16 @@ def process_pipeline(source_path, whisper_model, start_type, generate_pdf=True, 
     # Step 3: Study material (from transcript)
     if not study_file.exists():
         def study():
-            # Large, single PromptTemplate that tells the LLM to ignore lecture
-            # structure and instead author a standalone textbook‑style chapter.
-            study_prompt = PromptTemplate.from_template(
-                "You are a world-class domain expert and textbook author. A transcript from a lecture is provided below.\n\n"
-                "### YOUR TASK (Two Phases):\n\n"
-                "**Phase 1 — Concept Extraction:**\n"
-                "Read the transcript and identify the core SUBJECT DOMAIN, TOPICS, and CONCEPTS being discussed. "
-                "The transcript is ONLY a source of topic hints — do NOT summarize, paraphrase, or follow the structure of the transcript.\n\n"
-                "**Phase 2 — Authoritative Content Generation:**\n"
-                "Write a comprehensive, standalone textbook chapter that teaches these topics in depth — as if you are writing for a professional reference book, NOT summarizing a lecture. "
-                "You must write ORIGINAL, AUTHORITATIVE content about the identified topics.\n\n"
-                "### CRITICAL RULES:\n"
-                "1. **NEVER reference the transcript, lecture, video, speaker, presentation, or recording.** Do not use phrases like 'In this video', 'The speaker explains', 'As discussed in the lecture', 'The presenter mentions'. Write as if no transcript exists.\n"
-                "2. **Do NOT follow the transcript's structure or flow.** Organize content by the logical structure of the DOMAIN KNOWLEDGE itself.\n"
-                "3. **Go BEYOND what was said.** For each concept:\n"
-                "   - Define it precisely and explain why it matters\n"
-                "   - Describe types, classifications, or variations\n"
-                "   - Explain how to implement or apply it step by step\n"
-                "   - List common mistakes and pitfalls and how to avoid them\n"
-                "   - Reference relevant industry standards, frameworks, or best practices\n"
-                "   - Provide practical real-world examples\n"
-                "4. **Write like a textbook author**, not a note-taker. Every section should teach the reader something they can apply.\n"
-                "5. **Professional Tone**: Maintain a formal, academic, yet engaging tone suitable for a professional study guide.\n"
-                "6. **Formatting**: Use clean Markdown with clear hierarchies. Ensure mathematical formulas or code snippets are in appropriate blocks.\n\n"
-                "### STRUCTURE YOUR RESPONSE WITH THESE SECTIONS:\n\n"
-                "# [Authoritative Title for the Subject Domain]\n\n"
-                "## 1. Learning Objectives\n"
-                "List 3-5 clear, actionable objectives. What will the reader be able to DO after mastering this material?\n\n"
-                "## 2. Executive Overview\n"
-                "A detailed 2-3 paragraph introduction to the subject domain. Why does this topic matter? What problems does it solve? Where does it fit in the broader field?\n\n"
-                "## 3. Core Concepts & Technical Definitions\n"
-                "Define each fundamental concept with precision. Use **bold** for key terms. For each term, include: definition, significance, and how it relates to other concepts.\n\n"
-                "## 4. In-Depth Subject Matter Coverage\n"
-                "This is the main body. Organize by DOMAIN LOGIC, not by transcript order. Use logical headings (###) and sub-headings (####). For each major topic:\n"
-                "- Explain the concept thoroughly with first-principles reasoning\n"
-                "- Provide step-by-step processes or methodologies where applicable\n"
-                "- Include **Best Practices** callouts with actionable recommendations\n"
-                "- Include **Common Pitfalls** callouts warning about frequent mistakes\n"
-                "- Use blockquotes (>) for real-world scenarios, case studies, or analogies\n"
-                "- Reference industry standards and frameworks (e.g., NIST, ISO, IEEE, OWASP, etc.) where relevant\n"
-                "- Use code blocks (```) for any technical syntax, commands, or formulas\n\n"
-                "## 5. Summary & Actionable Takeaways\n"
-                "Synthesize the most critical knowledge into a 'Key Takeaways' list. Focus on what the reader should remember and apply immediately.\n\n"
-                "## 6. Glossary of Terms\n"
-                "A comprehensive list of technical terms with expanded definitions, context, and cross-references to related terms.\n\n"
-                "## 7. Knowledge Assessment (Bloom's Taxonomy Based)\n"
-                "Provide a robust set of questions to test different levels of understanding:\n\n"
-                "### Part A: Recall & Comprehension (10 MCQs)\n"
-                "Test foundational knowledge of the domain concepts.\n"
-                "**Q1:** Question?\n"
-                "- A) Option\n"
-                "- B) Option\n"
-                "- C) **Option (Correct)**\n"
-                "- D) Option\n\n"
-                "### Part B: Application & Analysis (5 Short Answer Questions)\n"
-                "Present realistic scenarios requiring the reader to apply domain knowledge.\n"
-                "**Q11:** Scenario/Question text?\n"
-                "*Answer:* Detailed explanation demonstrating practical application.\n\n"
-                "### Part C: Synthesis & Evaluation (2 Critical Thinking Challenges)\n"
-                "Require the reader to design solutions, compare approaches, or evaluate trade-offs.\n"
-                "**Q16:** Challenge prompt?\n"
-                "*Answer:* Guidelines for a high-quality response.\n\n"
-                "---\n"
-                "REMEMBER: You are a domain expert writing a textbook chapter. The transcript below is ONLY used to identify WHAT topics to cover. "
-                "Your content must be original, authoritative, and comprehensive — teach the reader the subjects as an expert would.\n\n"
-                "Transcript (for topic identification only):\n"
-                "{transcript}"
-            )
+            # Load the study prompt from an external file
+            prompt_path = Path(__file__).parent / "study_prompt.txt"
+            try:
+                with open(prompt_path, "r", encoding="utf-8") as f:
+                    prompt_template_text = f.read()
+            except FileNotFoundError:
+                print(f"    [ERROR] Prompt file not found: {prompt_path}")
+                return
+
+            study_prompt = PromptTemplate.from_template(prompt_template_text)
             # The LLM model is provided via Ollama; switching models only
             # requires changing the `llm_model` string.
             llm = OllamaLLM(model=llm_model)

@@ -26,6 +26,7 @@ The result is a system that demonstrates not only technical execution but also t
   - In-depth coverage with best practices and pitfalls
   - Glossary of important terms
   - Practice questions (MCQ, short answer, and critical thinking)
+- **Externalized Study Prompt**: Define the textbook author persona, structure, and rules in `study_prompt.txt` for easy customization.
 - **Enhanced PDF Generation**: Multi-engine PDF generation with XeLaTeX (Unicode support) → pdfLaTeX (enhanced) → Minimal fallback.
 - **Unicode Support**: Handles Greek letters, special characters, and international symbols in PDFs.
 - **Smart File Naming**: Conflict-aware naming for mixed media (`{stem}_images.txt` for conflicts, `{stem}.txt` for clean cases).
@@ -43,6 +44,7 @@ The result is a system that demonstrates not only technical execution but also t
 | Images → Text            | **Tesseract OCR**                    | Optical character recognition        |
 | Text → Summary           | **LangChain Core** + **Ollama LLM**  | Prompt orchestration & summarization |
 | Summary → Study Material | **LangChain PromptTemplate**         | Rich, structured learning content    |
+| Study Prompt             | **study_prompt.txt**                 | Externalized customization of output |
 | Markdown → PDF           | **Pandoc** + **XeLaTeX/pdfLaTeX**    | Professional document generation     |
 | CLI UX                   | **Python sys.stdout + spinner**      | User-friendly progress visualization |
 
@@ -256,3 +258,17 @@ random.gif (loose image)
 - Priority-based processing (video > audio > text > images)
 - Separate processing tracks for different media types
 - Comprehensive coverage of all content in mixed folders
+
+---
+
+## Customization
+
+### **Study Prompt (`study_prompt.txt`)**
+
+The AI's personality, output structure, and generation rules are defined in `study_prompt.txt`. You can modify this file to:
+- Change the tone of the generated textbook chapter.
+- Add or remove sections from the study material.
+- Update the "Bloom's Taxonomy" based question requirements.
+- Change the formatting or language requirements.
+
+The script expects a `{transcript}` placeholder at the end of the file where the source text will be injected.
