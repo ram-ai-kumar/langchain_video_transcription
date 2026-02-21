@@ -45,8 +45,10 @@ Thumbs.db
 # Transcripts
 *.txt
 
-# Summaries and study material
+# Summaries and study material (except in root and docs)
 *.md
+!/*.md
+!docs/*.md
 
 # Generated PDFs
 *.pdf
@@ -61,5 +63,4 @@ Thumbs.db
 *.log
 
 # But keep these important files
-!README.md
 !requirements.txt
