@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project began as a simple experiment: transcribing and understanding a few educational videos.  
+This project began as a simple experiment: transcribing and understanding a few educational videos.
 It evolved into a **fully automated object-oriented pipeline** that transforms raw media content into **rich learning material** — complete with transcripts, structured summaries, glossaries, and practice questions — all orchestrated seamlessly.
 
 The result is a system that demonstrates not only technical execution but also the **architectural thinking** required to design scalable, reliable, and extensible solutions for **mixed media processing** using modern software engineering principles.
@@ -32,6 +32,7 @@ Detailed documentation is split into logical sections. Each link opens the corre
 ### **Features & Capabilities**
 
 - [**Features**](docs/FEATURES.md) — Capabilities and feature list
+- [**AI Content Marking**](docs/AI_MARKING.md) — Watermarking, attribution, and acknowledgment for AI-generated PDFs
 - [**Supported Media Types**](docs/SUPPORTED_MEDIA_TYPES.md) — Video, audio, text, and image formats
 - [**Advanced Features**](docs/ADVANCED_FEATURES.md) — Unicode support, error recovery, mixed media intelligence
 - [**Example CLI Output**](docs/EXAMPLE_CLI_OUTPUT.md) — Sample terminal output for mixed media
