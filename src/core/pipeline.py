@@ -317,18 +317,13 @@ class VideoTranscriptionPipeline:
             if self.config.generate_pdf:
                 if not paths["pdf_file"].exists():
                     # PDF is missing — generate it from the existing study markdown
-                    self.status_reporter.info(f"Generating PDF for {source_path.name}...")
                     pdf_result = self.study_generator.generate_pdf_only(
                         paths["transcript_file"], paths["study_file"], paths["pdf_file"]
                     )
-                    if pdf_result.success:
-                        self.status_reporter.info(f"PDF generated: {paths['pdf_file'].name}")
-                    else:
+                    if not pdf_result.success:
                         self.status_reporter.error(
                             f"PDF generation failed for {source_path.name}: {pdf_result.message}"
                         )
-                else:
-                    self.status_reporter.info(f"PDF already exists: {paths['pdf_file'].name}")
                 self.progress_reporter.next_step()
 
             return ProcessResult(

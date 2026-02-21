@@ -4,8 +4,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
-from src.domain.ai_marking import AIMarkingConfig
-
 
 @dataclass
 class PipelineConfig:
@@ -18,10 +16,6 @@ class PipelineConfig:
     # Output settings
     generate_pdf: bool = True
     output_dir: Optional[Path] = None
-
-    # AI content marking settings
-    ai_marking_config: Optional[AIMarkingConfig] = field(default_factory=AIMarkingConfig.create_default)
-    enable_ai_marking: bool = True
 
     # File extensions
     video_extensions: List[str] = field(default_factory=lambda: [".mp4", ".mkv", ".avi", ".mov"])

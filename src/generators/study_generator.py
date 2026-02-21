@@ -5,7 +5,6 @@ from pathlib import Path
 from src.core.config import PipelineConfig
 from src.core.exceptions import ProcessingError
 from src.generators.pdf_generator import PDFGenerator
-from src.generators.enhanced_pdf_generator import EnhancedPDFGenerator
 from src.processors.llm_processor import LLMProcessor
 from src.processors.base import ProcessResult
 
@@ -17,13 +16,8 @@ class StudyMaterialGenerator:
         self.config = config
         self.llm_processor = LLMProcessor(config)
 
-        # Choose PDF generator based on AI marking configuration
-        if config.generate_pdf and config.enable_ai_marking:
-            self.pdf_generator = EnhancedPDFGenerator(
-                config,
-                config.ai_marking_config
-            )
-        elif config.generate_pdf:
+        # Always use basic PDF generator
+        if config.generate_pdf:
             self.pdf_generator = PDFGenerator(config)
         else:
             self.pdf_generator = None
@@ -60,39 +54,16 @@ class StudyMaterialGenerator:
             if self.pdf_generator and self.config.generate_pdf:
                 try:
                     pdf_result = self.pdf_generator.generate_pdf(study_file, pdf_file)
-
-                    # If enhanced PDF generator failed, try basic PDF generator as fallback
-                    if not pdf_result.success and hasattr(self.pdf_generator, '__class__') and 'Enhanced' in self.pdf_generator.__class__.__name__:
-                        print(f"[WARN] Enhanced PDF generation failed, trying basic PDF generator...")
-
-                        # Create basic PDF generator as fallback
-                        from src.generators.pdf_generator import PDFGenerator
-                        basic_generator = PDFGenerator(self.config)
-
-                        try:
-                            pdf_result = basic_generator.generate_pdf(study_file, pdf_file)
-                            if pdf_result.success:
-                                print(f"[INFO] Basic PDF generation succeeded")
-                                pdf_result.metadata = pdf_result.metadata or {}
-                                pdf_result.metadata["fallback_mode"] = True
-                                pdf_result.metadata["basic_generator"] = True
-                        except Exception as e:
-                            print(f"[ERROR] Basic PDF generator also failed: {e}")
-                            # Keep the original error message
-                            pdf_result = ProcessResult(
-                                success=False,
-                                message=f"Both enhanced and basic PDF generation failed. Original error: {pdf_result.message}. Basic error: {e}",
-                                output_path=pdf_file
-                            )
-
                     if pdf_result.success:
-                        print(f"[INFO] PDF generated successfully: {pdf_file.name}")
+                        pdf_result = pdf_result
                     else:
-                        print(f"[WARN] PDF generation failed: {pdf_result.message}")
+                        pdf_result = ProcessResult(
+                            success=False,
+                            message=f"PDF generation failed: {pdf_result.message}",
+                            output_path=pdf_file
+                        )
 
                 except Exception as e:
-                    # Log PDF generation error but don't fail the entire process
-                    print(f"[ERROR] PDF generation exception: {e}")
                     pdf_result = ProcessResult(
                         success=False,
                         message=f"PDF generation failed: {e}",
@@ -202,38 +173,10 @@ class StudyMaterialGenerator:
             )
 
         try:
-            # Try the configured PDF generator first
             pdf_result = self.pdf_generator.generate_pdf(study_file, pdf_file)
-
-            # If enhanced PDF generator failed, try basic PDF generator as fallback
-            if not pdf_result.success and hasattr(self.pdf_generator, '__class__') and 'Enhanced' in self.pdf_generator.__class__.__name__:
-                print(f"[WARN] Enhanced PDF generation failed, trying basic PDF generator...")
-
-                # Create basic PDF generator as fallback
-                from src.generators.pdf_generator import PDFGenerator
-                basic_generator = PDFGenerator(self.config)
-
-                try:
-                    pdf_result = basic_generator.generate_pdf(study_file, pdf_file)
-                    if pdf_result.success:
-                        print(f"[INFO] Basic PDF generation succeeded")
-                        pdf_result.metadata = pdf_result.metadata or {}
-                        pdf_result.metadata["fallback_mode"] = True
-                        pdf_result.metadata["basic_generator"] = True
-                except Exception as e:
-                    print(f"[ERROR] Basic PDF generator also failed: {e}")
-                    # Keep the original error message
-                    pdf_result = ProcessResult(
-                        success=False,
-                        message=f"Both enhanced and basic PDF generation failed. Original error: {pdf_result.message}. Basic error: {e}",
-                        output_path=pdf_file
-                    )
-
             return pdf_result
 
         except Exception as e:
-            if self.config.verbose:
-                print(f"[ERROR] PDF generation failed: {e}")
             return ProcessResult(
                 success=False,
                 message=f"PDF generation failed: {e}",

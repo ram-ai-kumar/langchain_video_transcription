@@ -4,16 +4,21 @@
 % Font and typography with Unicode support
 \usepackage{ifxetex}
 \ifxetex
+  % XeLaTeX: Use modern, readable sans-serif font
   \usepackage{fontspec}
-  % XeLaTeX handles Unicode natively
+  \setmainfont{Arial}           % Widely available sans-serif font
+  \setsansfont{Arial}           % Consistent sans-serif for headings
 \else
+  % pdfLaTeX: Use reliable sans-serif fonts
   \usepackage[utf8]{inputenc}
   \usepackage[T1]{fontenc}
-  \usepackage{textcomp}  % Additional text symbols
+  \usepackage{textcomp}
+  \usepackage{helvet}  % Helvetica - excellent sans-serif readability
 \fi
 
-% Use modern, readable font with clear bold and italic distinction
-\usepackage{charter}  % Charter - clean and readable
+% Simple symbols instead of icons (more compatible)
+\usepackage{tikz}
+\usepackage{amssymb}  % Additional math symbols
 
 % Enhanced Unicode support for Greek letters and special characters
 \usepackage{amsmath,amssymb}  % Math symbols including Greek letters
@@ -55,7 +60,7 @@
 \definecolor{codebackground}{RGB}{245,245,245}  % Light gray
 \definecolor{linkblue}{RGB}{0,123,255}          % Bright link blue
 
-% Headers and sections
+% Headers and sections with symbols
 \usepackage{titlesec}
 \titleformat{\section}
   {\Large\bfseries\color{headingcolor}}{\thesection}{1em}{}
@@ -74,9 +79,12 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.8em}
 
-% Lists
+% Lists with symbols
 \usepackage{enumitem}
 \setlist{itemsep=0.3em,topsep=0.5em,parsep=0em}
+\renewcommand{\labelitemi}{\textbullet}  % Bullet points
+\renewcommand{\labelitemii}{\textopenbullet}  % Nested bullets
+\renewcommand{\labelitemiii}{\textbullet}  % Third level bullets
 
 % Code blocks and verbatim
 \usepackage{fancyvrb}
@@ -87,7 +95,11 @@
   breaklines=true,
   frame=single,
   xleftmargin=0.5cm,
-  xrightmargin=0.5cm
+  xrightmargin=0.5cm,
+  framexleftmargin=3mm,
+  framexrightmargin=3mm,
+  framesep=2mm,
+  rulecolor=\color{subheadingcolor}
 }
 
 % Tables
@@ -111,7 +123,7 @@
 \renewcommand{\footrulewidth}{0.5pt}
 \fancyhead[L]{\leftmark}
 \fancyhead[R]{\thepage}
-\fancyfoot[C]{\small AI-generated Study Material | Ram Kumar, saas.expert.ram@gmail.com}
+\fancyfoot[C]{\small \textbf{AI-generated} Study Material | \textbf{Ram Kumar}, saas.expert.ram@gmail.com}
 
 % Better handling of images
 \usepackage{graphicx}

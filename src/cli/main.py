@@ -60,12 +60,6 @@ Examples:
         )
 
         parser.add_argument(
-            "--no-ai-marking",
-            action="store_true",
-            help="Disable AI content marking (watermark, attribution, acknowledgment)"
-        )
-
-        parser.add_argument(
             "--output-dir",
             type=Path,
             help="Output directory for generated files (default: same as input)"
@@ -143,7 +137,6 @@ Examples:
         # Override with command-line arguments
         config_dict.update({
             "generate_pdf": not args.no_pdf,
-            "enable_ai_marking": not args.no_ai_marking,
             "whisper_model": args.whisper_model,
             "llm_model": args.llm_model,
             "verbose": args.verbose,

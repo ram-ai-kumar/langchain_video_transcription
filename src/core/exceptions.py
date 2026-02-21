@@ -8,7 +8,7 @@ class VideoTranscriptionError(Exception):
 
 class ProcessingError(VideoTranscriptionError):
     """Raised when file processing fails."""
-    
+
     def __init__(self, message: str, file_path: str = None, processor: str = None):
         super().__init__(message)
         self.file_path = file_path
@@ -27,7 +27,10 @@ class ModelLoadError(VideoTranscriptionError):
 
 class PDFGenerationError(VideoTranscriptionError):
     """Raised when PDF generation fails."""
-    pass
+
+    def __init__(self, message: str, processor: str = None):
+        super().__init__(message)
+        self.processor = processor
 
 
 class OCRProcessingError(ProcessingError):
