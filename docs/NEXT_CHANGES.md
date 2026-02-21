@@ -1095,3 +1095,510 @@ jobs:
 - ✅ Business rules are straightforward
 - ✅ Only one interface (CLI) is needed
 - ✅ Infrastructure is unlikely to change
+
+---
+
+### **9. Planned Feature Enhancements**
+
+#### **9.1 AI Generated Content Marking System**
+
+To ensure transparency and proper attribution, all AI-generated content will be clearly marked with author identification and acknowledgments.
+
+##### **Watermark and Attribution System**
+
+**Core Requirements**:
+
+1. **AI Generation Watermark**: All generated PDFs will include a visible watermark identifying them as AI-generated content
+2. **Author Attribution Footer**: Every page will include `Ram Kumar, saas.expert.ram@gmail.com` in the footer
+3. **Acknowledgment Page**: A dedicated final page acknowledging the author and the utility script
+
+##### **Technical Implementation**
+
+**PDF Generation Service Enhancement**:
+
+```python
+class EnhancedPDFGenerationService(PDFGenerationService):
+    """Enhanced PDF generation with AI content marking."""
+
+    def __init__(self, config: PipelineConfig):
+        super().__init__(config)
+        self.author_info = AuthorInfo(
+            name="Ram Kumar",
+            email="saas.expert.ram@gmail.com"
+        )
+
+    def generate_study_material_pdf(
+        self,
+        study_material: StudyMaterial,
+        output_path: Path
+    ) -> PDF:
+        """Generate PDF with AI content marking."""
+
+        # Create base PDF
+        base_pdf = super().generate_study_material_pdf(
+            study_material, output_path
+        )
+
+        # Add AI marking and attribution
+        marked_pdf = self._add_ai_marking(base_pdf)
+        attributed_pdf = self._add_author_attribution(marked_pdf)
+        final_pdf = self._add_acknowledgment_page(attributed_pdf)
+
+        return final_pdf
+
+    def _add_ai_marking(self, pdf: PDF) -> PDF:
+        """Add AI-generated watermark to all pages."""
+        watermark_text = "AI Generated Content"
+
+        for page in pdf.pages:
+            page.add_watermark(
+                text=watermark_text,
+                position=WatermarkPosition.CENTER,
+                opacity=0.3,
+                rotation=45,
+                font_size=48,
+                color=Color.LIGHT_GRAY
+            )
+
+        return pdf
+
+    def _add_author_attribution(self, pdf: PDF) -> PDF:
+        """Add author attribution footer to all pages."""
+        footer_text = f"Ram Kumar, {self.author_info.email}"
+
+        for page in pdf.pages:
+            page.add_footer(
+                text=footer_text,
+                position=FooterPosition.BOTTOM_RIGHT,
+                font_size=10,
+                font_style=FontStyle.ITALIC,
+                color=Color.DARK_GRAY
+            )
+
+        return pdf
+
+    def _add_acknowledgment_page(self, pdf: PDF) -> PDF:
+        """Add acknowledgment page as the last page."""
+        acknowledgment_content = self._generate_acknowledgment_content()
+
+        acknowledgment_page = PDFPage(
+            content=acknowledgment_content,
+            page_number=len(pdf.pages) + 1
+        )
+
+        pdf.add_page(acknowledgment_page)
+        return pdf
+
+    def _generate_acknowledgment_content(self) -> str:
+        """Generate acknowledgment page content."""
+        return f"""
+# Acknowledgment
+
+This study material was generated using an automated utility script created by:
+
+**Ram Kumar**
+saas.expert.ram@gmail.com
+
+## About This Utility
+
+This Python-based system demonstrates advanced software engineering principles
+in media processing and AI-powered content generation. It seamlessly processes
+video, audio, text, and image files to create comprehensive learning materials
+including transcripts, summaries, glossaries, and practice questions.
+
+## Technical Features
+
+- **Multi-modal Media Processing**: Supports video, audio, text, and image inputs
+- **AI-Powered Content Generation**: Uses state-of-the-art language models
+- **Automated PDF Generation**: Creates professionally formatted study materials
+- **Intelligent Conflict Resolution**: Handles mixed media file scenarios
+- **Object-Oriented Architecture**: Clean, maintainable, and extensible design
+
+## Architecture Highlights
+
+- **Service-Oriented Design**: Loosely coupled, reusable services
+- **Domain-Driven Design**: Rich domain model with business logic encapsulation
+- **Comprehensive Testing**: High test coverage across all layers
+- **Error Handling**: Robust error management and recovery
+
+---
+
+*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
+"""
+```
+
+**Domain Model Extensions**:
+
+```python
+@dataclass(frozen=True)
+class AuthorInfo:
+    """Value object representing author information."""
+    name: str
+    email: str
+
+    def get_attribution_text(self) -> str:
+        return f"{self.name}, {self.email}"
+
+@dataclass(frozen=True)
+class WatermarkConfig:
+    """Configuration for PDF watermarking."""
+    text: str = "AI Generated Content"
+    opacity: float = 0.3
+    rotation: int = 45
+    font_size: int = 48
+    color: str = "#CCCCCC"
+    position: str = "center"
+
+class AIMarkedPDF(PDF):
+    """PDF entity with AI-generated content marking."""
+
+    def __init__(
+        self,
+        base_pdf: PDF,
+        author_info: AuthorInfo,
+        watermark_config: WatermarkConfig
+    ):
+        super().__init__(base_pdf.path)
+        self.base_pdf = base_pdf
+        self.author_info = author_info
+        self.watermark_config = watermark_config
+        self._marked = False
+
+    def apply_ai_marking(self) -> None:
+        """Apply AI marking to the PDF."""
+        if self._marked:
+            return
+
+        self._add_watermark()
+        self._add_attribution_footer()
+        self._add_acknowledgment_page()
+        self._marked = True
+
+    def is_ai_marked(self) -> bool:
+        """Check if PDF has AI marking."""
+        return self._marked
+```
+
+#### **9.2 PDF Processing Enhancement**
+
+Extend the pipeline to process existing PDF files for learning content generation, with intelligent detection of AI-generated content.
+
+##### **PDF Content Processing Pipeline**
+
+**Core Requirements**:
+
+1. **PDF Text Extraction**: Extract text content from PDF files
+2. **AI-Generated PDF Detection**: Identify and skip previously AI-generated PDFs
+3. **Learning Content Generation**: Process extracted text through existing LLM pipeline
+4. **Conflict Resolution**: Handle naming conflicts with existing files
+
+##### **PDF Processing Technical Implementation**
+
+**PDF Processing Service**:
+
+```python
+class PDFProcessingService(DomainService):
+    """Service for processing PDF files and detecting AI-generated content."""
+
+    def __init__(
+        self,
+        pdf_extractor: PDFTextExtractor,
+        ai_detector: AIGeneratedPDFDetector,
+        study_material_service: StudyMaterialGenerationService
+    ):
+        self.pdf_extractor = pdf_extractor
+        self.ai_detector = ai_detector
+        self.study_material_service = study_material_service
+
+    def process_pdf_file(self, pdf_file: MediaFile) -> ProcessResult:
+        """Process a PDF file for learning content generation."""
+
+        # Check if PDF is AI-generated
+        if self.ai_detector.is_ai_generated(pdf_file):
+            return ProcessResult(
+                success=False,
+                message="Skipping AI-generated PDF",
+                skipped_reason="AI_GENERATED"
+            )
+
+        # Extract text content
+        try:
+            extracted_content = self.pdf_extractor.extract_text(pdf_file.path)
+
+            if extracted_content.is_empty():
+                return ProcessResult(
+                    success=False,
+                    message="PDF contains no extractable text",
+                    skipped_reason="EMPTY_CONTENT"
+                )
+
+            # Create transcript from extracted content
+            transcript = Transcript(
+                transcript_id=str(uuid.uuid4()),
+                content=TranscriptContent(extracted_content.text),
+                source=pdf_file,
+                extraction_method=ExtractionMethod.PDF_TEXT
+            )
+
+            # Generate study material
+            study_material = self.study_material_service.generate_study_material(
+                transcript
+            )
+
+            return ProcessResult(
+                success=True,
+                transcript=transcript,
+                study_material=study_material
+            )
+
+        except Exception as e:
+            return ProcessResult(
+                success=False,
+                message=f"PDF processing failed: {str(e)}",
+                error=e
+            )
+
+class AIGeneratedPDFDetector(DomainService):
+    """Service for detecting AI-generated PDFs."""
+
+    def __init__(self, config: PipelineConfig):
+        self.config = config
+        self.ai_markers = [
+            "AI Generated Content",
+            "Ram Kumar, saas.expert.ram@gmail.com",
+            "Acknowledgment",
+            "This study material was generated using an automated utility"
+        ]
+
+    def is_ai_generated(self, pdf_file: MediaFile) -> bool:
+        """Detect if PDF is AI-generated by checking for markers."""
+
+        try:
+            # Extract first few pages for analysis
+            preview_content = self._extract_preview_content(pdf_file.path)
+
+            # Check for AI generation markers
+            marker_count = sum(
+                1 for marker in self.ai_markers
+                if marker.lower() in preview_content.lower()
+            )
+
+            # Consider AI-generated if multiple markers found
+            return marker_count >= 2
+
+        except Exception:
+            # If we can't analyze, assume it's not AI-generated
+            return False
+
+    def _extract_preview_content(self, pdf_path: Path) -> str:
+        """Extract content from first few pages for analysis."""
+        # Extract text from first 3 pages for marker detection
+        pages_to_check = min(3, self._get_page_count(pdf_path))
+        content_parts = []
+
+        for page_num in range(pages_to_check):
+            page_content = self._extract_page_text(pdf_path, page_num + 1)
+            content_parts.append(page_content)
+
+        return " ".join(content_parts)
+
+    def _get_page_count(self, pdf_path: Path) -> int:
+        """Get total page count of PDF."""
+        # Use PyPDF2 or similar to get page count
+        pass
+
+    def _extract_page_text(self, pdf_path: Path, page_num: int) -> str:
+        """Extract text from specific page."""
+        # Use pdfplumber or similar for text extraction
+        pass
+
+class PDFTextExtractor(InfrastructureService):
+    """Service for extracting text from PDF files."""
+
+    def __init__(self, config: PipelineConfig):
+        self.config = config
+        self.ocr_enabled = config.pdf_ocr_enabled
+
+    def extract_text(self, pdf_path: Path) -> ExtractedContent:
+        """Extract text content from PDF file."""
+
+        try:
+            # Try direct text extraction first
+            text_content = self._extract_direct_text(pdf_path)
+
+            # If direct extraction yields little content, try OCR
+            if len(text_content.strip()) < 100 and self.ocr_enabled:
+                text_content = self._extract_ocr_text(pdf_path)
+
+            return ExtractedContent(
+                text=text_content,
+                extraction_method=self._determine_extraction_method(text_content),
+                confidence_score=self._calculate_confidence(text_content)
+            )
+
+        except Exception as e:
+            raise PDFExtractionError(f"Failed to extract text from {pdf_path}: {e}")
+
+    def _extract_direct_text(self, pdf_path: Path) -> str:
+        """Extract text directly from PDF using pdfplumber."""
+        import pdfplumber
+
+        text_parts = []
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_parts.append(page_text)
+
+        return "\n".join(text_parts)
+
+    def _extract_ocr_text(self, pdf_path: Path) -> str:
+        """Extract text using OCR when direct extraction fails."""
+        # Convert PDF to images and use Tesseract OCR
+        pass
+
+    def _determine_extraction_method(self, text: str) -> ExtractionMethod:
+        """Determine which extraction method was most effective."""
+        if len(text.strip()) > 100:
+            return ExtractionMethod.DIRECT_TEXT
+        else:
+            return ExtractionMethod.OCR
+
+    def _calculate_confidence(self, text: str) -> float:
+        """Calculate confidence score for extracted text."""
+        # Simple heuristic based on text length and content quality
+        if not text or len(text.strip()) < 50:
+            return 0.0
+
+        # Check for meaningful content (words, sentences)
+        word_count = len(text.split())
+        sentence_count = text.count('.') + text.count('!') + text.count('?')
+
+        confidence = min(1.0, (word_count / 1000) + (sentence_count / 100))
+        return confidence
+
+@dataclass(frozen=True)
+class ExtractedContent:
+    """Value object representing extracted PDF content."""
+    text: str
+    extraction_method: ExtractionMethod
+    confidence_score: float
+
+    def is_empty(self) -> bool:
+        return len(self.text.strip()) == 0
+
+    def is_high_quality(self) -> bool:
+        return self.confidence_score > 0.7
+
+class ExtractionMethod(Enum):
+    """Enumeration of text extraction methods."""
+    DIRECT_TEXT = "direct_text"
+    OCR = "ocr"
+    MIXED = "mixed"
+```
+
+**Integration with Existing Pipeline**:
+
+```python
+class EnhancedMediaProcessingService(MediaProcessingService):
+    """Enhanced media processing service with PDF support."""
+
+    def __init__(
+        self,
+        audio_service: AudioTranscriptionService,
+        ocr_service: OCRService,
+        pdf_service: PDFProcessingService,
+        conflict_resolver: ConflictResolver
+    ):
+        super().__init__(audio_service, ocr_service, conflict_resolver)
+        self.pdf_service = pdf_service
+
+    def process_media_file(self, media_file: MediaFile) -> ProcessResult:
+        """Process media file including PDF support."""
+
+        if media_file.media_type == MediaType.PDF:
+            return self.pdf_service.process_pdf_file(media_file)
+        else:
+            return super().process_media_file(media_file)
+
+    def discover_media_files(self, directory: Path) -> List[MediaFile]:
+        """Discover media files including PDFs."""
+        media_files = super().discover_media_files(directory)
+
+        # Add PDF files to the discovery
+        for pdf_path in directory.rglob("*.pdf"):
+            media_file = MediaFile(
+                file_id=str(uuid.uuid4()),
+                path=FilePath.from_path(pdf_path),
+                media_type=MediaType.PDF
+            )
+            media_files.append(media_file)
+
+        return media_files
+```
+
+**File Type Extensions**:
+
+```python
+# Extend MediaType value object
+@dataclass(frozen=True)
+class MediaType:
+    """Immutable value object representing media type."""
+
+    name: str
+    extensions: Tuple[str, ...]
+
+    VIDEO = MediaType("video", (".mp4", ".mkv", ".avi", ".mov"))
+    AUDIO = MediaType("audio", (".mp3", ".wav", ".m4a", ".aac"))
+    TEXT = MediaType("text", (".txt",))
+    IMAGE = MediaType("image", (".png", ".jpg", ".jpeg", ".gif"))
+    PDF = MediaType("pdf", (".pdf",))  # New addition
+
+    @classmethod
+    def from_extension(cls, ext: str) -> Optional['MediaType']:
+        """Factory method: Create from file extension."""
+        ext_lower = ext.lower()
+        for media_type in [cls.VIDEO, cls.AUDIO, cls.TEXT, cls.IMAGE, cls.PDF]:
+            if ext_lower in media_type.extensions:
+                return media_type
+        return None
+```
+
+#### **Benefits of These Enhancements**
+
+**AI Content Marking Benefits**:
+
+- ✅ **Transparency**: Clear identification of AI-generated content
+- ✅ **Attribution**: Proper credit to the author/utility creator
+- ✅ **Professionalism**: Consistent branding and acknowledgment
+- ✅ **Traceability**: Easy identification of generated materials
+
+**PDF Processing Benefits**:
+
+- ✅ **Extended Capability**: Process existing learning materials
+- ✅ **Intelligent Filtering**: Skip AI-generated content to avoid loops
+- ✅ **Content Enrichment**: Extract value from existing PDFs
+- ✅ **Pipeline Integration**: Seamless integration with existing workflow
+
+#### **Implementation Priority**
+
+#### **Phase 1: AI Content Marking**
+
+1. Implement watermark and attribution system
+2. Add acknowledgment page generation
+3. Update PDF generation service
+4. Add domain model extensions
+
+#### **Phase 2: PDF Processing**
+
+1. Implement PDF text extraction service
+2. Create AI-generated PDF detection
+3. Integrate with existing media processing pipeline
+4. Add comprehensive testing
+
+#### **Phase 3: Integration and Testing**
+
+1. End-to-end workflow testing
+2. Performance optimization
+3. Error handling and edge cases
+4. Documentation updates
