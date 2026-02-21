@@ -59,7 +59,7 @@ src/
   - In-depth coverage with best practices and pitfalls
   - Glossary of important terms
   - Practice questions (MCQ, short answer, and critical thinking)
-- **Externalized Study Prompt**: Define the textbook author persona, structure, and rules in `study_prompt.txt` for easy customization.
+- **Externalized Study Prompt**: Define the textbook author persona, structure, and rules in `config/study_prompt.txt` for easy customization.
 - **Enhanced PDF Generation**: Multi-engine PDF generation with XeLaTeX (Unicode support) → pdfLaTeX (enhanced) → Minimal fallback.
 - **Unicode Support**: Handles Greek letters, special characters, and international symbols in PDFs.
 - **Smart File Naming**: Conflict-aware naming for mixed media (`{stem}_images.txt` for conflicts, `{stem}.txt` for clean cases).
@@ -77,7 +77,7 @@ src/
 | Images → Text            | **Tesseract OCR**                    | Optical character recognition        |
 | Text → Summary           | **LangChain Core** + **Ollama LLM**  | Prompt orchestration & summarization |
 | Summary → Study Material | **LangChain PromptTemplate**         | Rich, structured learning content    |
-| Study Prompt             | **study_prompt.txt**                 | Externalized customization of output |
+| Study Prompt             | **config/study_prompt.txt**          | Externalized customization of output |
 | Markdown → PDF           | **Pandoc** + **XeLaTeX/pdfLaTeX**    | Professional document generation     |
 | CLI UX                   | **Python sys.stdout + spinner**      | User-friendly progress visualization |
 
@@ -246,13 +246,13 @@ random.gif (loose image)
 
    ```bash
    # From the project root, with the virtualenv activated:
-   python video_transcribe.py ./data
+   python main.py ./data
    ```
 
 3. **Optional: skip PDF generation**
 
    ```bash
-   python video_transcribe.py ./data --no-pdf
+   python main.py ./data --no-pdf
    ```
 
 4. **Inspect outputs**
