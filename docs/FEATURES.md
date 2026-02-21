@@ -19,7 +19,14 @@
   - Practice questions (MCQ, short answer, and critical thinking)
 - **Externalized Study Prompt**: Define the textbook author persona, structure, and rules in `config/study_prompt.txt` for easy customization.
 - **Enhanced PDF Generation**: Multi-engine PDF generation with XeLaTeX (Unicode support) → pdfLaTeX (enhanced) → Minimal fallback.
+- **AI Content Marking**: Automatic watermarking, attribution, and acknowledgment for AI-generated PDFs.
+  - Configurable watermarks with "AI Generated Content" text
+  - Author attribution in PDF footers
+  - Detailed AI processing acknowledgment sections
+  - Customizable opacity, rotation, and positioning
 - **Unicode Support**: Handles Greek letters, special characters, and international symbols in PDFs.
 - **Smart File Naming**: Conflict-aware naming for mixed media (`{stem}_images.txt` for conflicts, `{stem}.txt` for clean cases).
 - **CLI Experience**: Clean, readable progress updates with dynamic pipeline paths and spinners.
+- **Comprehensive CLI Options**: Full command-line interface with configuration files, dependency checking, and validation modes.
+- **Comprehensive Testing**: Extensive test suite covering AI marking, PDF generation, and error handling scenarios.
 - **Robust Error Handling**: Graceful fallbacks and detailed error reporting for PDF generation issues.

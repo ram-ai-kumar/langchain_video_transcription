@@ -2,6 +2,27 @@
 
 [← Back to README](../README.md)
 
+## Option 1: Using mise (Recommended)
+
+1. **Clone the repository**
+
+   ```bash
+   git clone <this-repo-url> video_transcription
+   cd video_transcription
+   ```
+
+2. **Install mise** (if not already installed)
+   - Follow instructions at [https://mise.jdx.dev/](https://mise.jdx.dev/)
+
+3. **Install Python and dependencies with mise**
+
+   ```bash
+   mise install
+   pip install -r requirements.txt
+   ```
+
+## Option 2: Manual Setup
+
 1. **Clone the repository**
 
    ```bash
