@@ -167,17 +167,17 @@ Domain Layer
 ```python
 class MediaFile:
     """Domain entity representing a media file."""
-    
+
     def __init__(self, file_id: str, path: FilePath, media_type: MediaType):
         self.file_id = file_id  # Unique identifier
         self.path = path  # Value object
         self.media_type = media_type  # Value object
         self.metadata: Dict[str, Any] = {}
-    
+
     def can_be_transcribed(self) -> bool:
         """Business rule: Can this file be transcribed?"""
         return self.media_type in [MediaType.AUDIO, MediaType.VIDEO]
-    
+
     def get_processing_priority(self) -> int:
         """Business rule: Priority for processing (video > audio > text > image)."""
         priority_map = {
@@ -194,18 +194,18 @@ class MediaFile:
 ```python
 class Transcript:
     """Domain entity representing a transcript."""
-    
+
     def __init__(self, transcript_id: str, content: TranscriptContent, source: MediaFile):
         self.transcript_id = transcript_id
         self.content = content  # Value object
         self.source = source
         self.created_at: datetime = datetime.now()
         self.status: ProcessingStatus = ProcessingStatus.CREATED
-    
+
     def is_empty(self) -> bool:
         """Business rule: Is transcript empty?"""
         return self.content.is_empty()
-    
+
     def can_generate_study_material(self) -> bool:
         """Business rule: Can we generate study material from this transcript?"""
         return not self.is_empty() and self.status == ProcessingStatus.COMPLETED
@@ -216,7 +216,7 @@ class Transcript:
 ```python
 class StudyMaterial:
     """Domain entity representing generated study material."""
-    
+
     def __init__(self, material_id: str, content: StudyMaterialContent, transcript: Transcript):
         self.material_id = material_id
         self.content = content  # Value object
@@ -233,15 +233,15 @@ class StudyMaterial:
 @dataclass(frozen=True)
 class MediaType:
     """Immutable value object representing media type."""
-    
+
     name: str
     extensions: Tuple[str, ...]
-    
+
     VIDEO = MediaType("video", (".mp4", ".mkv", ".avi", ".mov"))
     AUDIO = MediaType("audio", (".mp3", ".wav", ".m4a", ".aac"))
     TEXT = MediaType("text", (".txt",))
     IMAGE = MediaType("image", (".png", ".jpg", ".jpeg", ".gif"))
-    
+
     @classmethod
     def from_extension(cls, ext: str) -> Optional['MediaType']:
         """Factory method: Create from file extension."""
@@ -258,9 +258,9 @@ class MediaType:
 @dataclass(frozen=True)
 class ProcessingStatus:
     """Immutable value object representing processing status."""
-    
+
     value: str
-    
+
     PENDING = ProcessingStatus("pending")
     IN_PROGRESS = ProcessingStatus("in_progress")
     COMPLETED = ProcessingStatus("completed")
@@ -275,7 +275,7 @@ class ProcessingStatus:
 ```python
 class ConflictResolver:
     """Domain service for resolving file naming conflicts."""
-    
+
     @staticmethod
     def resolve_naming_conflict(
         primary_file: MediaFile,
@@ -283,13 +283,13 @@ class ConflictResolver:
     ) -> Dict[MediaFile, FilePath]:
         """Business rule: Resolve naming conflicts for mixed media."""
         results = {}
-        
+
         # Primary file gets standard name
         results[primary_file] = FilePath(
             primary_file.path.directory,
             f"{primary_file.path.stem}.txt"
         )
-        
+
         # Conflicting images get suffixed name
         for file in conflicting_files:
             if file.media_type == MediaType.IMAGE:
@@ -297,7 +297,7 @@ class ConflictResolver:
                     file.path.directory,
                     f"{file.path.stem}_images.txt"
                 )
-        
+
         return results
 ```
 
@@ -306,20 +306,20 @@ class ConflictResolver:
 ```python
 class FileGroupingStrategy:
     """Domain service for grouping files by business rules."""
-    
+
     @staticmethod
     def group_by_stem(files: List[MediaFile]) -> Dict[str, List[MediaFile]]:
         """Business rule: Group files by stem (filename without extension)."""
         groups = defaultdict(list)
-        
+
         for file in files:
             stem = file.path.stem.lower()  # Case-insensitive grouping
             groups[stem].append(file)
-        
+
         # Sort files within each group by priority
         for stem in groups:
             groups[stem].sort(key=lambda f: f.get_processing_priority())
-        
+
         return dict(groups)
 ```
 
@@ -330,17 +330,17 @@ class FileGroupingStrategy:
 ```python
 class MediaFileRepository(ABC):
     """Repository interface for MediaFile persistence."""
-    
+
     @abstractmethod
     def find_by_path(self, path: FilePath) -> Optional[MediaFile]:
         """Find media file by path."""
         pass
-    
+
     @abstractmethod
     def find_by_directory(self, directory: Path) -> List[MediaFile]:
         """Find all media files in directory."""
         pass
-    
+
     @abstractmethod
     def save(self, media_file: MediaFile) -> None:
         """Save media file."""
@@ -352,14 +352,14 @@ class MediaFileRepository(ABC):
 ```python
 class FileSystemMediaFileRepository(MediaFileRepository):
     """File system implementation of MediaFileRepository."""
-    
+
     def __init__(self, config: PipelineConfig):
         self.config = config
-    
+
     def find_by_directory(self, directory: Path) -> List[MediaFile]:
         """Discover media files from file system."""
         media_files = []
-        
+
         for file_path in directory.rglob("*"):
             if file_path.is_file():
                 media_type = MediaType.from_extension(file_path.suffix)
@@ -370,7 +370,7 @@ class FileSystemMediaFileRepository(MediaFileRepository):
                         media_type=media_type
                     )
                     media_files.append(media_file)
-        
+
         return media_files
 ```
 
@@ -381,21 +381,21 @@ class FileSystemMediaFileRepository(MediaFileRepository):
 ```python
 class MediaProcessingAggregate:
     """Aggregate root for media processing operations."""
-    
+
     def __init__(self, media_file: MediaFile):
         self.media_file = media_file
         self.transcript: Optional[Transcript] = None
         self.study_material: Optional[StudyMaterial] = None
         self._domain_events: List[DomainEvent] = []
-    
+
     def transcribe(self, transcription_service: AudioTranscriptionService) -> None:
         """Business operation: Transcribe media file."""
         if not self.media_file.can_be_transcribed():
             raise DomainError("Media file cannot be transcribed")
-        
+
         self.transcript = transcription_service.transcribe(self.media_file)
         self._domain_events.append(TranscriptCreatedEvent(self.transcript))
-    
+
     def generate_study_material(
         self,
         llm_service: LLMGenerationService
@@ -403,10 +403,10 @@ class MediaProcessingAggregate:
         """Business operation: Generate study material from transcript."""
         if not self.transcript or not self.transcript.can_generate_study_material():
             raise DomainError("Cannot generate study material")
-        
+
         self.study_material = llm_service.generate_study_material(self.transcript)
         self._domain_events.append(StudyMaterialCreatedEvent(self.study_material))
-    
+
     def get_domain_events(self) -> List[DomainEvent]:
         """Return domain events for event sourcing."""
         return self._domain_events.copy()
@@ -540,11 +540,11 @@ class WhisperTranscriptionService(AudioTranscriptionService):
     def __init__(self, whisper_client: WhisperService, config: Config):
         self.whisper_client = whisper_client
         self.config = config
-    
+
     def transcribe(self, media_file: MediaFile) -> Transcript:
         if not media_file.can_be_transcribed():
             raise DomainError("Cannot transcribe this media type")
-        
+
         audio_content = self.whisper_client.transcribe(media_file.path)
         return Transcript(
             transcript_id=str(uuid.uuid4()),
@@ -561,7 +561,7 @@ class TranscriptionOrchestrationService:
     ):
         self.transcription_service = transcription_service
         self.repository = repository
-    
+
     def process_media_file(self, media_file: MediaFile) -> Transcript:
         transcript = self.transcription_service.transcribe(media_file)
         self.repository.save(transcript)
@@ -600,7 +600,484 @@ class TranscriptionOrchestrationService:
 
 ---
 
-### **7. When to Apply SOA + DDD**
+### **7. Test Coverage Strategy**
+
+#### **Current Test Coverage Limitations**
+
+The current codebase has minimal test coverage, which presents several challenges:
+
+1. **No Unit Tests**: Core business logic in processors is untested
+2. **Integration Gaps**: No tests for end-to-end workflows
+3. **External Dependencies**: Hard to test without actual Whisper/Tesseract/Ollama
+4. **Regression Risk**: Changes can break existing functionality silently
+5. **Refactoring Barriers**: Fear of breaking code prevents architecture improvements
+
+#### **Proposed Test Coverage Architecture**
+
+A comprehensive testing strategy aligned with SOA and DDD principles:
+
+```text
+Testing Pyramid
+┌─────────────────────────────────────────────────────────────┐
+│                    E2E Tests (5%)                           │
+│  - Full workflow testing                                    │
+│  - Integration with real external services                   │
+│  - User scenario validation                                  │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+┌───────────────────────▼─────────────────────────────────────┐
+│                Integration Tests (15%)                       │
+│  - Service layer integration                                 │
+│  - Repository implementations                               │
+│  - External service integrations                            │
+│  - Database/file system interactions                        │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+┌───────────────────────▼─────────────────────────────────────┐
+│                  Unit Tests (80%)                           │
+│  - Domain entities and value objects                        │
+│  - Domain services                                          │
+│  - Application services                                     │
+│  - Business logic validation                                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### **Domain Layer Testing**
+
+**Entity Tests**:
+
+```python
+class TestMediaFile:
+    """Unit tests for MediaFile domain entity."""
+
+    def test_can_be_transcribed_audio(self):
+        media_file = MediaFile(
+            file_id="test-1",
+            path=FilePath("/test/audio.mp3"),
+            media_type=MediaType.AUDIO
+        )
+        assert media_file.can_be_transcribed() is True
+
+    def test_can_be_transcribed_image(self):
+        media_file = MediaFile(
+            file_id="test-2",
+            path=FilePath("/test/image.png"),
+            media_type=MediaType.IMAGE
+        )
+        assert media_file.can_be_transcribed() is False
+
+    def test_processing_priority_video_highest(self):
+        video_file = MediaFile(
+            file_id="test-3",
+            path=FilePath("/test/video.mp4"),
+            media_type=MediaType.VIDEO
+        )
+        assert video_file.get_processing_priority() == 1
+
+class TestTranscript:
+    """Unit tests for Transcript domain entity."""
+
+    def test_empty_transcript_detection(self):
+        empty_content = TranscriptContent("")
+        transcript = Transcript(
+            transcript_id="test-1",
+            content=empty_content,
+            source=mock_media_file
+        )
+        assert transcript.is_empty() is True
+
+    def test_study_material_generation_eligibility(self):
+        content = TranscriptContent("Valid transcript content")
+        transcript = Transcript(
+            transcript_id="test-2",
+            content=content,
+            source=mock_media_file
+        )
+        transcript.status = ProcessingStatus.COMPLETED
+        assert transcript.can_generate_study_material() is True
+```
+
+**Value Object Tests**:
+
+```python
+class TestMediaType:
+    """Unit tests for MediaType value object."""
+
+    @pytest.mark.parametrize("extension,expected", [
+        (".mp4", MediaType.VIDEO),
+        (".mp3", MediaType.AUDIO),
+        (".txt", MediaType.TEXT),
+        (".png", MediaType.IMAGE),
+        (".unknown", None)
+    ])
+    def test_from_extension(self, extension, expected):
+        result = MediaType.from_extension(extension)
+        assert result == expected
+
+    def test_media_type_immutability(self):
+        video_type = MediaType.VIDEO
+        with pytest.raises(FrozenInstanceError):
+            video_type.name = "changed"
+```
+
+**Domain Service Tests**:
+
+```python
+class TestConflictResolver:
+    """Unit tests for ConflictResolver domain service."""
+
+    def test_resolve_naming_conflict_mixed_media(self):
+        primary_file = MediaFile(
+            file_id="primary",
+            path=FilePath("/test/lecture.mp4"),
+            media_type=MediaType.VIDEO
+        )
+        conflicting_image = MediaFile(
+            file_id="conflict",
+            path=FilePath("/test/lecture.png"),
+            media_type=MediaType.IMAGE
+        )
+
+        resolutions = ConflictResolver.resolve_naming_conflict(
+            primary_file, [conflicting_image]
+        )
+
+        assert resolutions[primary_file].name == "lecture.txt"
+        assert resolutions[conflicting_image].name == "lecture_images.txt"
+
+class TestFileGroupingStrategy:
+    """Unit tests for FileGroupingStrategy domain service."""
+
+    def test_group_by_stem_case_insensitive(self):
+        files = [
+            MediaFile("1", FilePath("/test/Lecture.mp4"), MediaType.VIDEO),
+            MediaFile("2", FilePath("/test/lecture.MP3"), MediaType.AUDIO),
+            MediaFile("3", FilePath("/test/LECTURE.png"), MediaType.IMAGE)
+        ]
+
+        groups = FileGroupingStrategy.group_by_stem(files)
+
+        assert "lecture" in groups
+        assert len(groups["lecture"]) == 3
+        # Verify priority ordering
+        assert groups["lecture"][0].media_type == MediaType.VIDEO
+```
+
+#### **Service Layer Testing**
+
+**Domain Service Tests with Mocks**:
+
+```python
+class TestAudioTranscriptionService:
+    """Unit tests for AudioTranscriptionService."""
+
+    def test_transcribe_audio_success(self, mock_whisper_service):
+        service = WhisperTranscriptionService(
+            whisper_client=mock_whisper_service,
+            config=test_config
+        )
+
+        media_file = MediaFile(
+            file_id="test-1",
+            path=FilePath("/test/audio.mp3"),
+            media_type=MediaType.AUDIO
+        )
+
+        mock_whisper_service.transcribe.return_value = "Test transcript"
+
+        transcript = service.transcribe(media_file)
+
+        assert isinstance(transcript, Transcript)
+        assert transcript.content.value == "Test transcript"
+        assert transcript.source == media_file
+        mock_whisper_service.transcribe.assert_called_once_with(media_file.path)
+
+    def test_transcribe_unsupported_media_type(self, mock_whisper_service):
+        service = WhisperTranscriptionService(
+            whisper_client=mock_whisper_service,
+            config=test_config
+        )
+
+        image_file = MediaFile(
+            file_id="test-2",
+            path=FilePath("/test/image.png"),
+            media_type=MediaType.IMAGE
+        )
+
+        with pytest.raises(DomainError, match="Cannot transcribe this media type"):
+            service.transcribe(image_file)
+```
+
+**Application Service Tests**:
+
+```python
+class TestTranscriptionOrchestrationService:
+    """Unit tests for TranscriptionOrchestrationService."""
+
+    def test_process_media_file_success(self, mock_transcription_service, mock_repository):
+        service = TranscriptionOrchestrationService(
+            transcription_service=mock_transcription_service,
+            repository=mock_repository
+        )
+
+        media_file = MediaFile(
+            file_id="test-1",
+            path=FilePath("/test/audio.mp3"),
+            media_type=MediaType.AUDIO
+        )
+
+        expected_transcript = Transcript(
+            transcript_id="transcript-1",
+            content=TranscriptContent("Test content"),
+            source=media_file
+        )
+
+        mock_transcription_service.transcribe.return_value = expected_transcript
+
+        result = service.process_media_file(media_file)
+
+        assert result == expected_transcript
+        mock_transcription_service.transcribe.assert_called_once_with(media_file)
+        mock_repository.save.assert_called_once_with(expected_transcript)
+```
+
+#### **Infrastructure Layer Testing**
+
+**Repository Tests**:
+
+```python
+class TestFileSystemMediaFileRepository:
+    """Integration tests for FileSystemMediaFileRepository."""
+
+    def test_find_by_directory_discovers_media_files(self, tmp_path):
+        # Create test files
+        (tmp_path / "video.mp4").touch()
+        (tmp_path / "audio.mp3").touch()
+        (tmp_path / "document.txt").touch()
+        (tmp_path / "image.png").touch()
+        (tmp_path / "unsupported.xyz").touch()
+
+        repository = FileSystemMediaFileRepository(test_config)
+        media_files = repository.find_by_directory(tmp_path)
+
+        assert len(media_files) == 4  # Excludes .xyz file
+
+        media_types = [f.media_type for f in media_files]
+        assert MediaType.VIDEO in media_types
+        assert MediaType.AUDIO in media_types
+        assert MediaType.TEXT in media_types
+        assert MediaType.IMAGE in media_types
+```
+
+#### **Integration Testing**
+
+**Service Integration Tests**:
+
+```python
+class TestTranscriptionWorkflow:
+    """Integration tests for complete transcription workflow."""
+
+    @pytest.mark.integration
+    def test_end_to_end_audio_transcription(self, tmp_path):
+        # Setup real Whisper service (or test double)
+        whisper_service = WhisperService(model_size="tiny")
+        repository = FileSystemMediaFileRepository(test_config)
+        transcription_service = WhisperTranscriptionService(whisper_service, test_config)
+        orchestration_service = TranscriptionOrchestrationService(
+            transcription_service=transcription_service,
+            repository=repository
+        )
+
+        # Create test audio file
+        audio_file_path = tmp_path / "test_audio.wav"
+        generate_test_audio_file(audio_file_path)
+
+        media_file = MediaFile(
+            file_id="test-1",
+            path=FilePath.from_path(audio_file_path),
+            media_type=MediaType.AUDIO
+        )
+
+        transcript = orchestration_service.process_media_file(media_file)
+
+        assert isinstance(transcript, Transcript)
+        assert not transcript.is_empty()
+        assert transcript.status == ProcessingStatus.COMPLETED
+```
+
+#### **End-to-End Testing**
+
+**CLI E2E Tests**:
+
+```python
+class TestCLIEndToEnd:
+    """End-to-end tests for CLI interface."""
+
+    @pytest.mark.e2e
+    def test_full_transcription_and_study_generation(self, tmp_path, runner):
+        # Setup test data
+        video_path = tmp_path / "lecture.mp4"
+        create_test_video_file(video_path)
+
+        # Run CLI command
+        result = runner.invoke([
+            "process", str(video_path),
+            "--output", str(tmp_path),
+            "--generate-study"
+        ])
+
+        assert result.exit_code == 0
+
+        # Verify outputs
+        transcript_path = tmp_path / "lecture.txt"
+        study_material_path = tmp_path / "lecture_study.pdf"
+
+        assert transcript_path.exists()
+        assert study_material_path.exists()
+
+        # Verify content
+        transcript_content = transcript_path.read_text()
+        assert len(transcript_content) > 0
+```
+
+#### **Test Coverage Goals**
+
+**Coverage Targets by Layer**:
+
+- **Domain Layer**: 95%+ coverage
+  - Entities: 100%
+  - Value Objects: 100%
+  - Domain Services: 90%+
+- **Service Layer**: 85%+ coverage
+  - Domain Services: 90%+
+  - Application Services: 85%+
+- **Infrastructure Layer**: 80%+ coverage
+  - Repositories: 85%+
+  - External Service Wrappers: 75%+
+- **Presentation Layer**: 70%+ coverage
+  - CLI Commands: 80%+
+  - API Endpoints: 75%+
+
+#### **Testing Tools and Infrastructure**
+
+**Core Testing Stack**:
+
+```python
+# pytest.ini
+[tool:pytest]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--cov=src",
+    "--cov-report=html",
+    "--cov-report=term-missing",
+    "--cov-fail-under=80"
+]
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (requires external services)",
+    "e2e: End-to-end tests (full workflow)",
+    "slow: Tests that take longer than 1 second"
+]
+```
+
+**Test Utilities**:
+
+```python
+# tests/fixtures.py
+@pytest.fixture
+def mock_whisper_service():
+    """Mock Whisper service for unit tests."""
+    with patch('src.services.whisper.WhisperService') as mock:
+        mock.transcribe.return_value = "Mock transcript content"
+        yield mock
+
+@pytest.fixture
+def test_media_file():
+    """Standard test media file."""
+    return MediaFile(
+        file_id="test-1",
+        path=FilePath("/test/audio.mp3"),
+        media_type=MediaType.AUDIO
+    )
+
+@pytest.fixture
+def tmp_path_with_media(tmp_path):
+    """Temporary directory with test media files."""
+    (tmp_path / "video.mp4").touch()
+    (tmp_path / "audio.mp3").touch()
+    (tmp_path / "image.png").touch()
+    return tmp_path
+```
+
+#### **Continuous Integration Testing**
+
+**GitHub Actions Workflow**:
+
+```yaml
+# .github/workflows/test.yml
+name: Test Suite
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10, 3.11]
+
+    services:
+      ollama:
+        image: ollama/ollama
+        ports:
+          - 11434:11434
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+
+    - name: Run unit tests
+      run: pytest -m "unit" --cov=src
+
+    - name: Run integration tests
+      run: pytest -m "integration"
+      env:
+        OLLAMA_HOST: http://localhost:11434
+
+    - name: Run E2E tests
+      run: pytest -m "e2e"
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+```
+
+#### **Test Coverage Benefits**
+
+**Immediate Benefits**:
+
+- ✅ **Regression Prevention**: Catch breaking changes early
+- ✅ **Refactoring Confidence**: Safely improve architecture
+- ✅ **Documentation**: Tests serve as living documentation
+- ✅ **Design Feedback**: Writing tests improves API design
+
+**Long-term Benefits**:
+
+- ✅ **Maintenance Efficiency**: Quickly identify and fix issues
+- ✅ **Team Velocity**: Reduce time spent on manual testing
+- ✅ **Code Quality**: Enforce consistent coding standards
+- ✅ **Architecture Evolution**: Safely implement SOA/DDD changes
+
+---
+
+### **8. When to Apply SOA + DDD**
 
 **Consider SOA + DDD when:**
 
