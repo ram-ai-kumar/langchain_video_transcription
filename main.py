@@ -8,11 +8,11 @@ text files, and images into comprehensive study materials with PDF generation.
 
 import sys
 from pathlib import Path
+from src.cli.main import main
 
 # Add src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from src.cli.main import main
-
+# Main entry point
 if __name__ == "__main__":
     main()
