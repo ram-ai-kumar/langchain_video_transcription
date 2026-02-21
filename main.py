@@ -13,6 +13,5 @@ from src.cli.main import main
 # Add src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-# Main entry point
 if __name__ == "__main__":
     main()
