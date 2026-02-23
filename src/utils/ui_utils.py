@@ -14,63 +14,6 @@ PROCESSING_STEPS = {
 }
 
 
-class Spinner:
-    """A lightweight CLI spinner for long-running operations."""
-
-    def __init__(self, prefix: str = "", spinner_chars: Optional[list] = None):
-        self.prefix = prefix
-        self.spinner_chars = spinner_chars or ["|", "/", "-", "\\"]
-        self._done = False
-        self._result = None
-        self._exception = None
-        self._thread = None
-
-    def __call__(self, run_func: Callable, *args, **kwargs) -> Any:
-        """Run function with spinner display."""
-        self._done = False
-        self._result = None
-        self._exception = None
-
-        # Start worker thread
-        self._thread = threading.Thread(target=self._run_target, args=(run_func, args, kwargs))
-        self._thread.start()
-
-        # Show spinner
-        self._show_spinner()
-
-        # Wait for completion
-        self._thread.join()
-
-        # Clean up display
-        sys.stdout.write(f"\r{self.prefix}\n")
-        sys.stdout.flush()
-
-        # Handle result or exception
-        if self._exception:
-            raise self._exception
-
-        return self._result
-
-    def _run_target(self, run_func: Callable, args: tuple, kwargs: dict) -> None:
-        """Target function for worker thread."""
-        try:
-            self._result = run_func(*args, **kwargs)
-        except Exception as e:
-            self._exception = e
-        finally:
-            self._done = True
-
-    def _show_spinner(self) -> None:
-        """Display spinner while operation is running."""
-        i = 0
-        while not self._done and self._thread.is_alive():
-            char = self.spinner_chars[i % len(self.spinner_chars)]
-            sys.stdout.write(f"\r{self.prefix} {char}")
-            sys.stdout.flush()
-            time.sleep(0.1)
-            i += 1
-
-
 class ProgressReporter:
     """Reports progress with fixed-width progress bar."""
 
@@ -232,9 +175,3 @@ class StatusReporter:
         """Report debug message."""
         if self.verbose:
             print(f"    {prefix} {message}")
-
-
-# Convenience function for backward compatibility
-def spinner(prefix: str, run_func: Callable, *args, **kwargs) -> Any:
-    """Convenience function for spinner usage."""
-    return Spinner(prefix)(run_func, *args, **kwargs)

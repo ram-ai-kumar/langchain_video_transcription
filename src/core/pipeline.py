@@ -178,13 +178,7 @@ class VideoTranscriptionPipeline:
                 # Process images to transcript
                 if not transcript_file.exists():
                     self.status_reporter.info(f"Processing images: {stem}/ ({len(image_files)} images)")
-
-                    if self.config.show_spinner:
-                        result = Spinner(
-                            f"    images ({len(image_files)}) > transcript ..."
-                        )(self.image_processor.process, image_files, transcript_file)
-                    else:
-                        result = self.image_processor.process(image_files, transcript_file)
+                    result = self.image_processor.process(image_files, transcript_file)
 
                     if not result.success:
                         self.status_reporter.error(f"Failed to process images for {stem}: {result.message}")
@@ -234,13 +228,7 @@ class VideoTranscriptionPipeline:
                 # Process images to transcript
                 if not transcript_file.exists():
                     self.status_reporter.info(f"Processing loose images: {folder_name}/ ({len(images)} images)")
-
-                    if self.config.show_spinner:
-                        result = Spinner(
-                            f"    images ({len(images)}) > transcript ..."
-                        )(self.image_processor.process, images, transcript_file)
-                    else:
-                        result = self.image_processor.process(images, transcript_file)
+                    result = self.image_processor.process(images, transcript_file)
 
                     if not result.success:
                         self.status_reporter.error(f"Failed to process loose images in {folder_name}: {result.message}")

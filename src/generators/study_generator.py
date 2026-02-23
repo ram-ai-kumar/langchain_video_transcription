@@ -195,7 +195,8 @@ class StudyMaterialGenerator:
         # Check transcript content for PDF extraction indicators
         try:
             if transcript_path.exists():
-                content = transcript_path.read_text(encoding='utf-8')
+                from src.utils.file_utils import FileManager
+                content = FileManager.safe_read_text(transcript_path)
                 # Look for PDF extraction indicators in content
                 content_lower = content.lower()
 

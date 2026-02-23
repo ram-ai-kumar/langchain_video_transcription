@@ -86,12 +86,6 @@ Examples:
             help="Show detailed progress information"
         )
 
-        parser.add_argument(
-            "--no-spinner",
-            action="store_true",
-            help="Disable progress spinner"
-        )
-
         # Validation options
         parser.add_argument(
             "--check-deps",
@@ -140,7 +134,6 @@ Examples:
             "whisper_model": args.whisper_model,
             "llm_model": args.llm_model,
             "verbose": args.verbose,
-            "show_spinner": not args.no_spinner,
         })
 
         if args.output_dir:

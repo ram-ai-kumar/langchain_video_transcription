@@ -78,7 +78,7 @@ class TextProcessor(BaseProcessor):
     def validate_text_content(self, text_path: Path) -> bool:
         """Validate that text file contains readable content."""
         try:
-            content = text_path.read_text(encoding="utf-8")
+            content = self._read_text_file(text_path)
             return len(content.strip()) > 0
         except Exception:
             return False
@@ -86,7 +86,7 @@ class TextProcessor(BaseProcessor):
     def get_text_stats(self, text_path: Path) -> dict:
         """Get statistics about the text file."""
         try:
-            content = text_path.read_text(encoding="utf-8")
+            content = self._read_text_file(text_path)
             lines = content.splitlines()
             words = content.split()
 

@@ -31,7 +31,6 @@ class PipelineConfig:
     transcription_language: str = "en"
 
     # UI settings
-    show_spinner: bool = True
     verbose: bool = False
 
     # Paths
