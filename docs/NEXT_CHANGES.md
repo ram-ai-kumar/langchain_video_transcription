@@ -1602,3 +1602,203 @@ class MediaType:
 2. Performance optimization
 3. Error handling and edge cases
 4. Documentation updates
+
+#### **9.3 Relative Path Display Enhancement**
+
+Improve terminal output clarity by showing the directory context for processed files, especially during recursive traversal into subfolders.
+
+##### **Relative Path Tracking**
+
+**Core Requirements**:
+
+1. **Base Directory Context**: Consider the initial input folder provided by the user as the "base".
+2. **Relative Path Calculation**: Calculate and display folder paths relative to this base.
+3. **Traversal Logging**: Show the relative folder path before processing the batch of files contained within it.
+4. **Clean Batch Output**: Maintain clean terminal output while providing clear context for deep directory structures.
+
+##### **Technical Implementation**
+
+**Pipeline Enhancement**:
+
+```python
+class VideoTranscriptionPipeline:
+    # ... existing code ...
+
+    def process_directory(self, directory: Path) -> ProcessResult:
+        """Process directory tree with relative path awareness."""
+        base_dir = directory.resolve()
+        
+        # ... discovery and processing logic ...
+        
+    def _get_relative_path_label(self, current_dir: Path, base_dir: Path) -> str:
+        """Calculate relative path for display."""
+        try:
+            rel_path = current_dir.resolve().relative_to(base_dir)
+            if str(rel_path) == ".":
+                return "root"
+            return str(rel_path)
+        except ValueError:
+            return current_dir.name
+
+    def _log_folder_context(self, current_dir: Path, base_dir: Path):
+        """Log the current directory context being processed."""
+        rel_label = self._get_relative_path_label(current_dir, base_dir)
+        self.status_reporter.info(f"Entering folder: {rel_label}")
+```
+
+#### **Benefits**
+
+- ✅ **Context Awareness**: Users immediately know which part of a complex directory structure is being processed
+- ✅ **Improved Logging**: Better traceability for deep recursion
+- ✅ **Clean Output**: Standardizes how subfolders are announced in the terminal
+
+---
+
+## Current Issues & Bug Fixes
+
+### **Progress Bar Completion Issue**
+
+#### **Problem Description**
+
+When processing multiple files, progress bars are sometimes left incomplete when the program moves to the next file. This creates a confusing user experience where:
+
+1. **Incomplete Progress Bars**: Previous file progress bars remain partially filled
+2. **No Error Indication**: Failed files don't show clear error status in red
+3. **Visual Confusion**: Users can't distinguish between completed, failed, and in-progress files
+
+#### **Current Behavior**
+```text
+[#########-------------------] file1.txt
+[##########------------------] file2.mp3
+[#######--------------------] file3.png
+```
+
+#### **Expected Behavior**
+```text
+[##########################] file1.txt
+[##########################] file2.mp3         Error: Transcription failed (Red colored text)
+[##########################] file3.png
+```
+
+#### **Root Cause Analysis**
+
+The issue is in the `ProgressReporter.complete_processing()` method in `src/utils/ui_utils.py`:
+
+1. **Missing Completion Call**: When errors occur, `complete_processing(False)` may not be called
+2. **Line Management**: Progress bars aren't properly cleared or marked as complete
+3. **Error Display**: Failed files don't get red error indicators on the progress line
+4. **State Management**: Progress state isn't properly reset between files
+
+#### **Proposed Solution**
+
+##### 1. Ensure Progress Completion
+
+```python
+# In pipeline.py - wrap all file processing with try/finally
+try:
+    self.progress_reporter.start_processing(file_name, steps)
+    # ... processing logic ...
+    self.progress_reporter.complete_processing(success=True)
+except Exception as e:
+    self.progress_reporter.complete_processing(success=False)
+    self.status_reporter.error(f"Failed to process {file_name}: {e}")
+    raise
+```
+
+##### 2. Enhanced Progress Display
+
+```python
+# In ui_utils.py - improve complete_processing method
+def complete_processing(self, success: bool = True) -> None:
+    if self.processing:
+        self._show_progress()
+
+        progress_line = f"[{self._get_progress_bar()}] {self.current_file}"
+        
+        if success:
+            print(f"\r{progress_line}")
+        else:
+            # show failed step if available
+            step_name = self.steps[self.current_step] if self.current_step < len(self.steps) else "unknown step"
+            error_text = f"{progress_line} Error: {step_name} failed"
+            print(f"\r{ColorFormatter.error(error_text)}")
+
+        self.processing = False
+```
+
+##### 3. Error State Management
+
+```python
+# Add error state tracking to ProgressReporter
+def __init__(self, verbose: bool = False):
+    # ... existing init ...
+    self.error_message = None
+
+def set_error(self, message: str) -> None:
+    """Set error message for current file."""
+    self.error_message = message
+
+def complete_processing(self, success: bool = True) -> None:
+    if self.processing:
+        self._show_progress()
+        
+        progress_line = f"[{self._get_progress_bar()}] {self.current_file}"
+
+        if success:
+            print(f"\r{progress_line}")
+        else:
+            step_name = self.steps[self.current_step] if self.current_step < len(self.steps) else "unknown step"
+            error_msg = self.error_message or f"{step_name} failed"
+            error_line = f"{progress_line} Error: {error_msg}"
+            print(f"\r{ColorFormatter.error(error_line)}")
+
+        self.processing = False
+        self.error_message = None
+```
+
+##### 4. Pipeline Integration
+
+```python
+# In pipeline.py - ensure proper error handling
+def process_single_source(self, source_path: Path, source_type: str) -> ProcessResult:
+    file_name = source_path.name
+    steps = PROCESSING_STEPS.get(source_type, ["processing"])
+
+    try:
+        self.progress_reporter.start_processing(file_name, steps)
+
+        # ... existing processing logic ...
+
+        self.progress_reporter.complete_processing(success=True)
+        return result
+
+    except Exception as e:
+        self.progress_reporter.set_error(str(e))
+        self.progress_reporter.complete_processing(success=False)
+        raise ProcessingError(f"Failed to process {file_name}: {e}")
+```
+
+#### **Implementation Steps**
+
+1. **Fix ProgressReporter** - Update `complete_processing()` to show completion status
+2. **Add Error Tracking** - Add error message storage and display
+3. **Update Pipeline** - Ensure proper try/finally blocks around all processing
+4. **Color Entire Line** - Use standard color for success, red for entire failure line
+5. **Hide Emojis** - Do not use checkboxes or extra symbols
+6. **Test Edge Cases** - Verify behavior with partial failures and interruptions
+
+#### **Files to Modify**
+
+- `src/utils/ui_utils.py` - Enhanced ProgressReporter class
+- `src/core/pipeline.py` - Proper error handling and progress completion
+- `tests/test_ui_utils.py` - Tests for progress bar completion (new file)
+
+#### **Benefits**
+
+- ✅ **Clear Status**: Users can see which files succeeded/failed
+- ✅ **Error Visibility**: Failed files show red error indicators
+- ✅ **Clean Interface**: Progress bars are properly completed or marked as failed
+- ✅ **Better UX**: No more confusing incomplete progress bars
+- ✅ **Debugging**: Error messages are visible on the progress line
+
+#### **Priority**: **High** - This is a user experience issue that affects the perceived reliability of the application
