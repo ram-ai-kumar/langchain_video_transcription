@@ -2,34 +2,408 @@
 
 [← Back to README](../README.md)
 
-This document describes **planned architecture evolution** for the Video Transcription & Study Material Generator. It outlines how the codebase may be improved with **Service-Oriented Architecture (SOA)** and **Domain-Driven Design (DDD)** in future releases. These are forward-looking proposals, not current implementation.
+This document describes **planned improvements and architecture evolution** for the Video Transcription & Study Material Generator. Items are ordered from most critical to least significant, followed by long-term architectural proposals: **Service-Oriented Architecture (SOA)** and **Domain-Driven Design (DDD)**.
 
 ---
 
-## Architecture Evolution: Service-Oriented Architecture & Domain-Driven Design
+## **Critical Improvements (Immediate Priority)**
+
+### **1. Replace `print()` with the `logging` Module**
+
+**Current State**: Every processor and utility uses bare `print()` statements throughout the codebase
+
+**Required Actions**:
+
+- Adopt `logging.getLogger(__name__)` in every module
+- Wire `--verbose` CLI flag to log levels (`DEBUG`, `INFO`, `WARNING`, `ERROR`)
+- Add a single root logger configuration in `src/core/pipeline.py` at startup
+- Remove all bare `print()` calls from processors, generators, and utilities
+
+**Example**:
+
+```python
+# Before
+print(f"Processing {audio_path}...")
+
+# After
+import logging
+logger = logging.getLogger(__name__)
+logger.info("Processing %s", audio_path)
+```
+
+**Impact**: Makes output filterable and redirectable; critical for debugging batch runs and production deployments
+
+---
+
+### **2. Testing Infrastructure & CI/CD**
+
+**Current State**: Minimal testing — only `test_ai_marking.py` exists; no CI/CD pipeline
+
+**Required Actions**:
+
+- **Add test dependencies**:
+  ```text
+  pytest>=7.0.0
+  pytest-cov>=4.0.0
+  pytest-mock>=3.10.0
+  ```
+- **Create comprehensive test suite** covering:
+  - Unit tests for all processors (`AudioProcessor`, `ImageProcessor`, `TextProcessor`, `LLMProcessor`)
+  - Integration tests for pipeline workflows
+  - CLI argument parsing tests
+  - Configuration validation tests
+  - File utility and media detection tests
+- **Implement test fixtures** for temporary files and mock models
+- **Add GitHub Actions CI/CD** (`.github/workflows/ci.yml`):
+  - Run `pytest` on every push and pull request
+  - Run `ruff` or `flake8` linting
+  - Run `mypy` type checking
+  - Enforce minimum 60% code coverage
+
+**Impact**: Essential for code reliability and enabling safe refactoring
+
+---
+
+### **3. Async / Parallel File Processing**
+
+**Current State**: Sequential processing — 10 independent lecture videos block each other
+
+**Required Actions**:
+
+- Use `concurrent.futures.ThreadPoolExecutor` for I/O-bound transcription and LLM calls
+- Expose `max_workers` as a CLI option and config field
+- Add progress tracking that works across concurrent jobs
+
+**Example**:
+
+```python
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
+    with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
+        futures = {
+            executor.submit(self.process_single_source, file, media_type): file
+            for file, media_type in files_to_process
+        }
+        results = []
+        for future in as_completed(futures):
+            results.append(future.result())
+    return results
+```
+
+**Impact**: Significant performance improvement for batch processing
+
+---
+
+### **4. Populate the `src/domain/` Layer**
+
+**Current State**: `src/domain/` only contains `__init__.py`; business logic is scattered across processors and the pipeline
+
+**Required Actions**:
+
+- Create `TranscriptDocument` value object
+- Create `StudyMaterial` aggregate
+- Move `AIMarkingConfig` / `WatermarkConfig` from `pdf_generator.py` into domain
+- Extract file-grouping and conflict-resolution business rules from `pipeline.py` into domain services
+- Ensure the domain layer has zero infrastructure dependencies
+
+**Impact**: Makes business rules testable in isolation; enables the SOA/DDD evolution described later
+
+---
+
+### **5. Configuration Validation with Pydantic**
+
+**Current State**: `PipelineConfig` is a plain `@dataclass` — invalid values (e.g., `whisper_model="huge"`) fail late in the pipeline with cryptic errors
+
+**Required Actions**:
+
+- Migrate `PipelineConfig` to `pydantic.BaseModel`
+- Add field-level validators:
+  ```python
+  from pydantic import BaseModel, field_validator
+
+  class PipelineConfig(BaseModel):
+      whisper_model: str = "medium"
+      llm_model: str = "gemma3"
+
+      @field_validator("whisper_model")
+      @classmethod
+      def validate_whisper_model(cls, v: str) -> str:
+          valid = {"tiny", "base", "small", "medium", "large", "large-v2", "large-v3"}
+          if v not in valid:
+              raise ValueError(f"Invalid whisper model '{v}'. Choose from: {sorted(valid)}")
+          return v
+  ```
+- Add environment variable support for sensitive settings
+- Support YAML/TOML config files alongside JSON
+
+**Impact**: Catches bad inputs at startup with clear error messages instead of mid-pipeline crashes
+
+---
+
+## **Medium-Term Enhancements**
+
+### **6. Temporary File Cleanup**
+
+**Current State**: Audio extracted from video (`.wav`/`.mp3` temp files) is not guaranteed to be cleaned up when processing fails mid-run
+
+**Required Actions**:
+
+- Wrap audio extraction in a context manager or `try/finally` block:
+  ```python
+  import tempfile
+
+  with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tmp:
+      extract_audio(video_path, tmp.name)
+      transcribe(tmp.name)
+  ```
+- Audit all temporary file creation paths and ensure cleanup in failure scenarios
+
+**Impact**: Prevents disk space accumulation from repeated failed runs
+
+---
+
+### **7. LLM Connection Reuse + Retry**
+
+**Current State**: A new `OllamaLLM` instance is created per file; `tenacity` is already in `requirements.txt` but unused
+
+**Required Actions**:
+
+- Instantiate `OllamaLLM` once at pipeline startup and pass it through to all processors
+- Add retry with exponential backoff for LLM calls:
+  ```python
+  from tenacity import retry, stop_after_attempt, wait_exponential
+
+  @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+  def generate_study_material(self, content: str) -> str:
+      return self.chain.invoke({"content": content})
+  ```
+- Add a circuit breaker to stop retrying if Ollama is clearly unavailable
+
+**Impact**: Reduces connection overhead for batch runs; prevents transient LLM failures from aborting the pipeline
+
+---
+
+### **8. Error Handling & Resilience**
+
+**Current State**: Basic exception handling with custom types; transient failures abort processing
+
+**Required Actions**:
+
+- Improve error context — include file paths and pipeline stage in all exception messages
+- Add graceful degradation: if PDF generation fails, still save the markdown output
+- Log failures per-file and continue processing remaining files instead of stopping
+
+**Impact**: Prevents one bad file from aborting a long batch run
+
+---
+
+### **9. Security & Input Validation**
+
+**Current State**: Basic file existence checks only
+
+**Required Actions**:
+
+- Sanitize file paths to prevent directory traversal attacks
+- Validate file sizes before loading into memory to prevent resource exhaustion
+- Add file type verification beyond extension checking (magic number / MIME sniffing)
+- Implement dependency injection for processors to improve testability and reduce hidden coupling
+
+**Impact**: Prevents security vulnerabilities and resource abuse
+
+---
+
+### **10. Code Quality & Developer Experience**
+
+**Current State**: Good structure but missing tooling; type hints exist but are not enforced
+
+**Required Actions**:
+
+- Add `pyproject.toml` to consolidate version, tool configuration, and metadata:
+  ```toml
+  [tool.pytest.ini_options]
+  testpaths = ["tests"]
+
+  [tool.mypy]
+  strict = true
+
+  [tool.ruff]
+  line-length = 100
+  ```
+- Add pre-commit hooks: `ruff`, `mypy`, `pytest`
+- Add code coverage reporting with minimum thresholds
+- Create contributor development guide
+
+**Impact**: Improved code maintainability and developer onboarding
+
+---
+
+## **Nice-to-Have / Polish**
+
+### **11. OCR Quality Improvement**
+
+**Current State**: Raw `pytesseract.image_to_string()` with default config gives poor results on lecture slides with dark backgrounds or small fonts
+
+**Required Actions**:
+
+- Pre-process images before OCR: convert to grayscale, apply adaptive thresholding
+- Pass `--psm 6` (assume uniform block of text) to Tesseract for slide-like images
+- Use `config.ocr_language` consistently — the current code falls back to a hard-coded `"eng"` in places
+
+**Impact**: Meaningfully better text extraction from lecture slide images
+
+---
+
+### **12. Whisper Model Caching Across Runs**
+
+**Current State**: The Whisper model is loaded once per pipeline invocation but reloaded on every new run, which is slow
+
+**Required Actions**:
+
+- Document model caching behavior clearly
+- Consider a persistent model server pattern (similar to Ollama) for high-frequency use cases
+- At minimum, detect if the model is already cached locally and log the load time
+
+**Impact**: Reduces startup time for repeated processing sessions
+
+---
+
+### **13. Study Prompt Versioning**
+
+**Current State**: `config/study_prompt.txt` is a flat text file with no version metadata; impossible to tell which prompt version produced which study material
+
+**Required Actions**:
+
+- Embed a `PROMPT_VERSION` header comment in the file (e.g., `# version: 1.2`)
+- Stamp the prompt version into the generated study material metadata or footer
+- Keep a short changelog at the top of the prompt file
+
+**Impact**: Reproducibility — enables comparing output quality across prompt versions
+
+---
+
+### **14. Dependency Management with `pip-compile`**
+
+**Current State**: `requirements.txt` lists 54 packages, many of which are transitive dependencies mixed with direct ones
+
+**Required Actions**:
+
+- Split into `requirements.in` (direct dependencies only) and generate `requirements.txt` via `pip-compile`
+- Move version, project metadata, and tool config into `pyproject.toml`
+
+**Impact**: Cleaner dependency management; easier to upgrade packages safely
+
+---
+
+### **15. Clarify or Populate `src/domain/` Naming**
+
+**Current State**: The directory is labeled `domain/` (DDD language) but `src/core/pipeline.py` is doing the actual domain orchestration; `src/domain/` is empty
+
+**Required Actions**:
+
+- Either commit to DDD properly (populate with aggregates, entities, value objects — see DDD section below)
+- Or rename to `src/models/` to avoid misleading contributors about architectural intent
+
+**Impact**: Reduces confusion for contributors about where business logic belongs
+
+---
+
+### **16. Enhanced CLI Features**
+
+**Current State**: Comprehensive but some user experience gaps
+
+**Required Actions**:
+
+- Add dry-run mode (`--dry-run`) for previewing operations without processing
+- Add interactive configuration wizard for first-time users
+- Improve progress bars with ETA estimates for long transcription jobs
+
+**Impact**: Better user experience and reduced configuration errors
+
+---
+
+### **17. Plugin Architecture**
+
+**Proposed Enhancement**: Allow custom processors and generators via a plugin system
+
+```python
+class PluginManager:
+    def load_plugins(self, plugin_dir: Path):
+        for plugin_file in plugin_dir.glob("*.py"):
+            self.load_plugin(plugin_file)
+
+    def register_processor(self, processor_class: type[BaseProcessor]):
+        self._processors.append(processor_class)
+```
+
+**Use Cases**: Custom media formats, specialized processing pipelines, organization-specific output formats
+
+---
+
+### **18. REST API Interface**
+
+**Proposed Enhancement**: Web interface for remote processing
+
+```python
+from fastapi import FastAPI, UploadFile
+
+app = FastAPI()
+
+@app.post("/process")
+async def process_files(files: list[UploadFile]):
+    job_id = await create_processing_job(files)
+    return {"job_id": job_id, "status": "queued"}
+
+@app.get("/status/{job_id}")
+async def get_job_status(job_id: str):
+    return await get_job_progress(job_id)
+```
+
+**Use Cases**: Web interface, integration with LMS platforms, multi-user environments
+
+---
+
+### **19. Database Integration**
+
+**Proposed Enhancement**: Metadata storage and search capabilities
+
+**Features**:
+
+- Metadata storage for processed files (timestamps, processing stats)
+- Job queue system for background processing
+- Search capabilities across generated content
+- Processing history and analytics
+
+**Use Cases**: Large-scale deployments, content management systems
+
+---
+
+### **20. Advanced PDF Features**
+
+**Proposed Enhancement**: Enhanced PDF generation with more customization
+
+**Features**:
+
+- Custom themes and styling options
+- Interactive elements (bookmarks, internal hyperlinks)
+- Batch PDF generation with a master table of contents
+- PDF optimization for different use cases (print vs. screen)
+
+---
+
+## **Architecture Evolution: Service-Oriented Architecture (SOA)**
 
 ### **Current Architecture Limitations**
 
-While the current architecture is well-structured, it has some limitations that could be addressed with **Service-Oriented Architecture (SOA)** and **Domain-Driven Design (DDD)**:
+While the current architecture is well-structured, it has some limitations:
 
 1. **Tight Coupling**: Processors directly depend on infrastructure (Whisper, Tesseract, Pandoc)
-2. **Anemic Domain Model**: Business logic is scattered across processors rather than encapsulated in domain objects
+2. **Limited Scalability**: Monolithic design makes independent scaling difficult
 3. **Infrastructure Leakage**: File paths, external tool calls, and technical details are mixed with business logic
 4. **Limited Testability**: Hard to mock external dependencies and test business rules in isolation
-5. **No Domain Language**: Code uses technical terms rather than domain concepts (e.g., "processor" vs "transcription service")
-6. **Missing Abstractions**: No clear service boundaries or domain boundaries
+5. **No Clear Service Boundaries**: Functionality is grouped by technical concerns rather than business capabilities
 
-### **Proposed Architecture: SOA + DDD**
-
-The following sections outline how to evolve the architecture using SOA and DDD principles.
-
----
-
-### **1. Service-Oriented Architecture (SOA)**
-
-SOA organizes functionality into **loosely coupled, reusable services** with well-defined interfaces. Each service encapsulates a specific business capability.
-
-#### **Service Layer Structure**
+### **Proposed SOA Structure**
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
@@ -47,73 +421,43 @@ SOA organizes functionality into **loosely coupled, reusable services** with wel
         ┌───────────────┼───────────────┐
         │               │               │
 ┌───────▼──────┐ ┌──────▼──────┐ ┌─────▼──────┐
-│ Domain       │ │ Infrastructure│ │ External   │
-│ Services     │ │ Services      │ │ Services   │
+│ Domain       │ │Infrastructure│ │ External   │
+│ Services     │ │ Services     │ │ Services   │
 │              │ │              │ │            │
 │ - Audio      │ │ - File       │ │ - Whisper  │
-│   Transcription│ │   Storage    │ │ - Tesseract│
+│   Transcript │ │   Storage    │ │ - Tesseract│
 │ - OCR        │ │ - PDF        │ │ - Ollama   │
-│ - LLM        │ │   Generation  │ │            │
+│ - LLM        │ │   Generation │ │            │
 │   Generation │ │              │ │            │
 └──────────────┘ └──────────────┘ └────────────┘
 ```
 
-#### **Key Services**
+### **Key Services**
 
 **Application Services** (Orchestration Layer):
 
-- **`TranscriptionOrchestrationService`**:
-  - Coordinates the entire transcription workflow
-  - Manages three-pass processing
-  - Handles file grouping and conflict resolution
-  - Delegates to domain services for business logic
-
-- **`StudyMaterialGenerationService`**:
-  - Orchestrates study material creation
-  - Coordinates LLM processing and PDF generation
-  - Manages output file paths
-
-- **`MediaProcessingService`**:
-  - Handles media type detection
-  - Routes to appropriate domain services
-  - Manages processing priority
+- **`TranscriptionOrchestrationService`**: Coordinates the entire transcription workflow, manages three-pass processing, handles file grouping and conflict resolution
+- **`StudyMaterialGenerationService`**: Orchestrates study material creation, coordinates LLM processing and PDF generation
+- **`MediaProcessingService`**: Handles media type detection, routes to appropriate domain services, manages processing priority
 
 **Domain Services** (Business Logic Layer):
 
-- **`AudioTranscriptionService`**:
-  - Interface: `transcribe_audio(audio_file: AudioFile) -> Transcript`
-  - Encapsulates transcription business rules
-  - Delegates to infrastructure for actual transcription
-
-- **`OCRService`**:
-  - Interface: `extract_text(images: List[ImageFile]) -> Transcript`
-  - Handles OCR business logic
-  - Manages batch processing rules
-
-- **`LLMGenerationService`**:
-  - Interface: `generate_study_material(transcript: Transcript) -> StudyMaterial`
-  - Encapsulates prompt engineering logic
-  - Manages LLM interaction patterns
+- **`AudioTranscriptionService`**: `transcribe_audio(audio_file: AudioFile) -> Transcript`
+- **`OCRService`**: `extract_text(images: list[ImageFile]) -> Transcript`
+- **`LLMGenerationService`**: `generate_study_material(transcript: Transcript) -> StudyMaterial`
 
 **Infrastructure Services** (Technical Layer):
 
-- **`FileStorageService`**:
-  - Interface: `save_file(content: bytes, path: Path)`, `read_file(path: Path) -> bytes`
-  - Abstracts file system operations
-  - Enables testing with in-memory storage
-
-- **`PDFGenerationService`**:
-  - Interface: `generate_pdf(markdown: str, output_path: Path) -> PDF`
-  - Abstracts PDF generation details
-  - Handles engine fallback logic
+- **`FileStorageService`**: `save_file(content: bytes, path: Path)`, `read_file(path: Path) -> bytes`
+- **`PDFGenerationService`**: `generate_pdf(markdown: str, output_path: Path) -> PDF`
 
 **External Services** (Integration Layer):
 
-- **`WhisperService`**: Wraps Whisper API calls
+- **`WhisperService`**: Wraps Whisper model calls
 - **`TesseractService`**: Wraps Tesseract OCR calls
 - **`OllamaService`**: Wraps Ollama LLM API calls
 
-#### **Benefits of SOA**
+### **Benefits of SOA**
 
 1. **Loose Coupling**: Services communicate through well-defined interfaces
 2. **Reusability**: Services can be reused across different applications
@@ -124,11 +468,11 @@ SOA organizes functionality into **loosely coupled, reusable services** with wel
 
 ---
 
-### **2. Domain-Driven Design (DDD)**
+## **Architecture Evolution: Domain-Driven Design (DDD)**
 
 DDD focuses on **modeling the business domain** using domain concepts, entities, value objects, and aggregates.
 
-#### **Domain Model Structure**
+### **Domain Model Structure**
 
 ```text
 Domain Layer
@@ -160,7 +504,7 @@ Domain Layer
     └── StudyMaterialRepository
 ```
 
-#### **Domain Entities**
+### **Domain Entities**
 
 **`MediaFile`** (Entity):
 
@@ -169,10 +513,10 @@ class MediaFile:
     """Domain entity representing a media file."""
 
     def __init__(self, file_id: str, path: FilePath, media_type: MediaType):
-        self.file_id = file_id  # Unique identifier
-        self.path = path  # Value object
-        self.media_type = media_type  # Value object
-        self.metadata: Dict[str, Any] = {}
+        self.file_id = file_id
+        self.path = path
+        self.media_type = media_type
+        self.metadata: dict[str, Any] = {}
 
     def can_be_transcribed(self) -> bool:
         """Business rule: Can this file be transcribed?"""
@@ -184,7 +528,7 @@ class MediaFile:
             MediaType.VIDEO: 1,
             MediaType.AUDIO: 2,
             MediaType.TEXT: 3,
-            MediaType.IMAGE: 4
+            MediaType.IMAGE: 4,
         }
         return priority_map.get(self.media_type, 999)
 ```
@@ -197,17 +541,15 @@ class Transcript:
 
     def __init__(self, transcript_id: str, content: TranscriptContent, source: MediaFile):
         self.transcript_id = transcript_id
-        self.content = content  # Value object
+        self.content = content
         self.source = source
         self.created_at: datetime = datetime.now()
         self.status: ProcessingStatus = ProcessingStatus.CREATED
 
     def is_empty(self) -> bool:
-        """Business rule: Is transcript empty?"""
         return self.content.is_empty()
 
     def can_generate_study_material(self) -> bool:
-        """Business rule: Can we generate study material from this transcript?"""
         return not self.is_empty() and self.status == ProcessingStatus.COMPLETED
 ```
 
@@ -219,13 +561,13 @@ class StudyMaterial:
 
     def __init__(self, material_id: str, content: StudyMaterialContent, transcript: Transcript):
         self.material_id = material_id
-        self.content = content  # Value object
+        self.content = content
         self.transcript = transcript
-        self.pdf_path: Optional[FilePath] = None
+        self.pdf_path: FilePath | None = None
         self.created_at: datetime = datetime.now()
 ```
 
-#### **Value Objects**
+### **Value Objects**
 
 **`MediaType`** (Value Object):
 
@@ -235,7 +577,7 @@ class MediaType:
     """Immutable value object representing media type."""
 
     name: str
-    extensions: Tuple[str, ...]
+    extensions: tuple[str, ...]
 
     VIDEO = MediaType("video", (".mp4", ".mkv", ".avi", ".mov"))
     AUDIO = MediaType("audio", (".mp3", ".wav", ".m4a", ".aac"))
@@ -243,8 +585,7 @@ class MediaType:
     IMAGE = MediaType("image", (".png", ".jpg", ".jpeg", ".gif"))
 
     @classmethod
-    def from_extension(cls, ext: str) -> Optional['MediaType']:
-        """Factory method: Create from file extension."""
+    def from_extension(cls, ext: str) -> "MediaType | None":
         ext_lower = ext.lower()
         for media_type in [cls.VIDEO, cls.AUDIO, cls.TEXT, cls.IMAGE]:
             if ext_lower in media_type.extensions:
@@ -257,8 +598,6 @@ class MediaType:
 ```python
 @dataclass(frozen=True)
 class ProcessingStatus:
-    """Immutable value object representing processing status."""
-
     value: str
 
     PENDING = ProcessingStatus("pending")
@@ -268,7 +607,7 @@ class ProcessingStatus:
     SKIPPED = ProcessingStatus("skipped")
 ```
 
-#### **Domain Services**
+### **Domain Services**
 
 **`ConflictResolver`** (Domain Service):
 
@@ -279,25 +618,13 @@ class ConflictResolver:
     @staticmethod
     def resolve_naming_conflict(
         primary_file: MediaFile,
-        conflicting_files: List[MediaFile]
-    ) -> Dict[MediaFile, FilePath]:
-        """Business rule: Resolve naming conflicts for mixed media."""
+        conflicting_files: list[MediaFile],
+    ) -> dict[MediaFile, FilePath]:
         results = {}
-
-        # Primary file gets standard name
-        results[primary_file] = FilePath(
-            primary_file.path.directory,
-            f"{primary_file.path.stem}.txt"
-        )
-
-        # Conflicting images get suffixed name
+        results[primary_file] = FilePath(primary_file.path.directory, f"{primary_file.path.stem}.txt")
         for file in conflicting_files:
             if file.media_type == MediaType.IMAGE:
-                results[file] = FilePath(
-                    file.path.directory,
-                    f"{file.path.stem}_images.txt"
-                )
-
+                results[file] = FilePath(file.path.directory, f"{file.path.stem}_images.txt")
         return results
 ```
 
@@ -305,174 +632,84 @@ class ConflictResolver:
 
 ```python
 class FileGroupingStrategy:
-    """Domain service for grouping files by business rules."""
-
     @staticmethod
-    def group_by_stem(files: List[MediaFile]) -> Dict[str, List[MediaFile]]:
-        """Business rule: Group files by stem (filename without extension)."""
-        groups = defaultdict(list)
-
+    def group_by_stem(files: list[MediaFile]) -> dict[str, list[MediaFile]]:
+        groups: dict[str, list[MediaFile]] = defaultdict(list)
         for file in files:
-            stem = file.path.stem.lower()  # Case-insensitive grouping
-            groups[stem].append(file)
-
-        # Sort files within each group by priority
+            groups[file.path.stem.lower()].append(file)
         for stem in groups:
             groups[stem].sort(key=lambda f: f.get_processing_priority())
-
         return dict(groups)
 ```
 
-#### **Repositories**
+### **Repositories**
 
-**`MediaFileRepository`** (Repository Interface):
+**`MediaFileRepository`** (Interface):
 
 ```python
 class MediaFileRepository(ABC):
-    """Repository interface for MediaFile persistence."""
+    @abstractmethod
+    def find_by_path(self, path: FilePath) -> MediaFile | None: ...
 
     @abstractmethod
-    def find_by_path(self, path: FilePath) -> Optional[MediaFile]:
-        """Find media file by path."""
-        pass
+    def find_by_directory(self, directory: Path) -> list[MediaFile]: ...
 
     @abstractmethod
-    def find_by_directory(self, directory: Path) -> List[MediaFile]:
-        """Find all media files in directory."""
-        pass
-
-    @abstractmethod
-    def save(self, media_file: MediaFile) -> None:
-        """Save media file."""
-        pass
+    def save(self, media_file: MediaFile) -> None: ...
 ```
 
-**`FileSystemMediaFileRepository`** (Repository Implementation):
+**`FileSystemMediaFileRepository`** (Implementation):
 
 ```python
 class FileSystemMediaFileRepository(MediaFileRepository):
-    """File system implementation of MediaFileRepository."""
-
     def __init__(self, config: PipelineConfig):
         self.config = config
 
-    def find_by_directory(self, directory: Path) -> List[MediaFile]:
-        """Discover media files from file system."""
+    def find_by_directory(self, directory: Path) -> list[MediaFile]:
         media_files = []
-
         for file_path in directory.rglob("*"):
             if file_path.is_file():
                 media_type = MediaType.from_extension(file_path.suffix)
                 if media_type:
-                    media_file = MediaFile(
-                        file_id=str(uuid.uuid4()),
-                        path=FilePath.from_path(file_path),
-                        media_type=media_type
+                    media_files.append(
+                        MediaFile(
+                            file_id=str(uuid.uuid4()),
+                            path=FilePath.from_path(file_path),
+                            media_type=media_type,
+                        )
                     )
-                    media_files.append(media_file)
-
         return media_files
 ```
 
-#### **Aggregates**
+### **Aggregates**
 
 **`MediaProcessingAggregate`** (Aggregate Root):
 
 ```python
 class MediaProcessingAggregate:
-    """Aggregate root for media processing operations."""
-
     def __init__(self, media_file: MediaFile):
         self.media_file = media_file
-        self.transcript: Optional[Transcript] = None
-        self.study_material: Optional[StudyMaterial] = None
-        self._domain_events: List[DomainEvent] = []
+        self.transcript: Transcript | None = None
+        self.study_material: StudyMaterial | None = None
+        self._domain_events: list[DomainEvent] = []
 
     def transcribe(self, transcription_service: AudioTranscriptionService) -> None:
-        """Business operation: Transcribe media file."""
         if not self.media_file.can_be_transcribed():
             raise DomainError("Media file cannot be transcribed")
-
         self.transcript = transcription_service.transcribe(self.media_file)
         self._domain_events.append(TranscriptCreatedEvent(self.transcript))
 
-    def generate_study_material(
-        self,
-        llm_service: LLMGenerationService
-    ) -> None:
-        """Business operation: Generate study material from transcript."""
+    def generate_study_material(self, llm_service: LLMGenerationService) -> None:
         if not self.transcript or not self.transcript.can_generate_study_material():
-            raise DomainError("Cannot generate study material")
-
+            raise DomainError("Cannot generate study material without a valid transcript")
         self.study_material = llm_service.generate_study_material(self.transcript)
         self._domain_events.append(StudyMaterialCreatedEvent(self.study_material))
 
-    def get_domain_events(self) -> List[DomainEvent]:
-        """Return domain events for event sourcing."""
+    def get_domain_events(self) -> list[DomainEvent]:
         return self._domain_events.copy()
 ```
 
-#### **Benefits of DDD**
-
-1. **Ubiquitous Language**: Code uses domain terms that match business language
-2. **Rich Domain Model**: Business logic is encapsulated in domain objects
-3. **Testability**: Domain logic can be tested without infrastructure
-4. **Maintainability**: Changes to business rules are localized to domain layer
-5. **Clarity**: Domain concepts are explicit and well-defined
-6. **Flexibility**: Can change infrastructure without affecting domain logic
-
----
-
-### **3. Combined Architecture: SOA + DDD**
-
-Combining SOA and DDD creates a powerful architecture:
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│              Presentation Layer (CLI, API, Web)             │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-┌───────────────────────▼─────────────────────────────────────┐
-│         Application Services (Orchestration)                │
-│  - TranscriptionOrchestrationService                        │
-│  - StudyMaterialGenerationService                           │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-┌───────────────────────▼─────────────────────────────────────┐
-│              Domain Layer (Business Logic)                  │
-│  Entities: MediaFile, Transcript, StudyMaterial            │
-│  Value Objects: MediaType, ProcessingStatus                 │
-│  Domain Services: ConflictResolver, FileGroupingStrategy     │
-│  Aggregates: MediaProcessingAggregate                        │
-│  Repositories: MediaFileRepository (interface)             │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-┌───────────────────────▼─────────────────────────────────────┐
-│         Infrastructure Layer (Technical Details)             │
-│  - FileSystemMediaFileRepository (implements Repository)    │
-│  - FileStorageService                                       │
-│  - PDFGenerationService                                     │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-┌───────────────────────▼─────────────────────────────────────┐
-│         External Services (Third-party APIs)                │
-│  - WhisperService                                           │
-│  - TesseractService                                         │
-│  - OllamaService                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-#### **Key Principles**
-
-1. **Dependency Inversion**: Domain layer doesn't depend on infrastructure
-2. **Service Contracts**: Clear interfaces between layers
-3. **Domain Events**: Use events for loose coupling between aggregates
-4. **Repository Pattern**: Abstract persistence behind repository interfaces
-5. **Value Objects**: Use immutable value objects for domain concepts
-
----
-
-### **4. Migration Strategy**
+### **Migration Strategy**
 
 #### **Phase 1: Introduce Service Layer**
 
@@ -498,1055 +735,60 @@ Combining SOA and DDD creates a powerful architecture:
 #### **Phase 4: Refactor Application Services**
 
 1. Create application services that orchestrate domain services
-2. Move orchestration logic from pipeline to application services
+2. Move orchestration logic from `pipeline.py` into application services
 3. Use domain events for cross-aggregate communication
 4. Implement proper transaction boundaries
 
----
+### **Benefits of DDD**
 
-### **5. Example: Refactored Code**
+1. **Ubiquitous Language**: Code uses domain terms that match business language
+2. **Rich Domain Model**: Business logic is encapsulated in domain objects
+3. **Testability**: Domain logic can be tested without infrastructure dependencies
+4. **Maintainability**: Changes to business rules are localized to the domain layer
+5. **Clarity**: Domain concepts are explicit and well-defined
+6. **Flexibility**: Infrastructure can be swapped without affecting domain logic
 
-#### **Before (Current Architecture)**
-
-```python
-# Current: Processor directly uses infrastructure
-class AudioProcessor(BaseProcessor):
-    def process(self, audio_path: Path, transcript_path: Path) -> ProcessResult:
-        model = whisper.load_model(self.config.whisper_model)
-        result = model.transcribe(str(audio_path))
-        with open(transcript_path, "w") as f:
-            f.write(result["text"])
-        return ProcessResult(success=True, ...)
-```
-
-#### **After (SOA + DDD)**
-
-```python
-# Domain Entity
-class MediaFile:
-    def __init__(self, file_id: str, path: FilePath, media_type: MediaType):
-        self.file_id = file_id
-        self.path = path
-        self.media_type = media_type
-
-# Domain Service Interface
-class AudioTranscriptionService(ABC):
-    @abstractmethod
-    def transcribe(self, media_file: MediaFile) -> Transcript:
-        pass
-
-# Domain Service Implementation
-class WhisperTranscriptionService(AudioTranscriptionService):
-    def __init__(self, whisper_client: WhisperService, config: Config):
-        self.whisper_client = whisper_client
-        self.config = config
-
-    def transcribe(self, media_file: MediaFile) -> Transcript:
-        if not media_file.can_be_transcribed():
-            raise DomainError("Cannot transcribe this media type")
-
-        audio_content = self.whisper_client.transcribe(media_file.path)
-        return Transcript(
-            transcript_id=str(uuid.uuid4()),
-            content=TranscriptContent(audio_content),
-            source=media_file
-        )
-
-# Application Service
-class TranscriptionOrchestrationService:
-    def __init__(
-        self,
-        transcription_service: AudioTranscriptionService,
-        repository: TranscriptRepository
-    ):
-        self.transcription_service = transcription_service
-        self.repository = repository
-
-    def process_media_file(self, media_file: MediaFile) -> Transcript:
-        transcript = self.transcription_service.transcribe(media_file)
-        self.repository.save(transcript)
-        return transcript
-```
-
----
-
-### **6. Benefits Summary**
-
-#### **Service-Oriented Architecture Benefits**
-
-- ✅ **Loose Coupling**: Services communicate through interfaces
-- ✅ **Reusability**: Services can be reused across applications
-- ✅ **Testability**: Easy to mock and test services independently
-- ✅ **Scalability**: Services can be scaled independently
-- ✅ **Technology Independence**: Swap implementations without changing interfaces
-
-#### **Domain-Driven Design Benefits**
-
-- ✅ **Ubiquitous Language**: Code matches business terminology
-- ✅ **Rich Domain Model**: Business logic encapsulated in domain objects
-- ✅ **Testability**: Domain logic testable without infrastructure
-- ✅ **Maintainability**: Business rule changes localized to domain layer
-- ✅ **Clarity**: Domain concepts are explicit and well-defined
-- ✅ **Flexibility**: Change infrastructure without affecting domain logic
-
-#### **Combined Benefits**
-
-- ✅ **Separation of Concerns**: Clear boundaries between layers
-- ✅ **Business Focus**: Domain layer focuses on business rules
-- ✅ **Technical Flexibility**: Infrastructure can be swapped easily
-- ✅ **Testability**: Each layer can be tested independently
-- ✅ **Maintainability**: Changes are localized to appropriate layers
-- ✅ **Extensibility**: Easy to add new services or domain concepts
-
----
-
-### **7. Test Coverage Strategy**
-
-#### **Current Test Coverage Limitations**
-
-The current codebase has minimal test coverage, which presents several challenges:
-
-1. **No Unit Tests**: Core business logic in processors is untested
-2. **Integration Gaps**: No tests for end-to-end workflows
-3. **External Dependencies**: Hard to test without actual Whisper/Tesseract/Ollama
-4. **Regression Risk**: Changes can break existing functionality silently
-5. **Refactoring Barriers**: Fear of breaking code prevents architecture improvements
-
-#### **Proposed Test Coverage Architecture**
-
-A comprehensive testing strategy aligned with SOA and DDD principles:
+### **Combined SOA + DDD Architecture**
 
 ```text
-Testing Pyramid
 ┌─────────────────────────────────────────────────────────────┐
-│                    E2E Tests (5%)                           │
-│  - Full workflow testing                                    │
-│  - Integration with real external services                   │
-│  - User scenario validation                                  │
+│              Presentation Layer (CLI, API, Web)             │
 └───────────────────────┬─────────────────────────────────────┘
                         │
 ┌───────────────────────▼─────────────────────────────────────┐
-│                Integration Tests (15%)                       │
-│  - Service layer integration                                 │
-│  - Repository implementations                               │
-│  - External service integrations                            │
-│  - Database/file system interactions                        │
+│         Application Services (Orchestration)                │
+│  - TranscriptionOrchestrationService                        │
+│  - StudyMaterialGenerationService                           │
 └───────────────────────┬─────────────────────────────────────┘
                         │
 ┌───────────────────────▼─────────────────────────────────────┐
-│                  Unit Tests (80%)                           │
-│  - Domain entities and value objects                        │
-│  - Domain services                                          │
-│  - Application services                                     │
-│  - Business logic validation                                │
+│              Domain Layer (Business Logic)                  │
+│  Entities: MediaFile, Transcript, StudyMaterial             │
+│  Value Objects: MediaType, ProcessingStatus                 │
+│  Domain Services: ConflictResolver, FileGroupingStrategy    │
+│  Aggregates: MediaProcessingAggregate                       │
+│  Repositories: MediaFileRepository (interface)              │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+┌───────────────────────▼─────────────────────────────────────┐
+│         Infrastructure Layer (Technical Details)            │
+│  - FileSystemMediaFileRepository (implements Repository)    │
+│  - FileStorageService                                       │
+│  - PDFGenerationService                                     │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+┌───────────────────────▼─────────────────────────────────────┐
+│         External Services (Third-party APIs)                │
+│  - WhisperService                                           │
+│  - TesseractService                                         │
+│  - OllamaService                                            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-#### **Domain Layer Testing**
-
-**Entity Tests**:
-
-```python
-class TestMediaFile:
-    """Unit tests for MediaFile domain entity."""
-
-    def test_can_be_transcribed_audio(self):
-        media_file = MediaFile(
-            file_id="test-1",
-            path=FilePath("/test/audio.mp3"),
-            media_type=MediaType.AUDIO
-        )
-        assert media_file.can_be_transcribed() is True
-
-    def test_can_be_transcribed_image(self):
-        media_file = MediaFile(
-            file_id="test-2",
-            path=FilePath("/test/image.png"),
-            media_type=MediaType.IMAGE
-        )
-        assert media_file.can_be_transcribed() is False
-
-    def test_processing_priority_video_highest(self):
-        video_file = MediaFile(
-            file_id="test-3",
-            path=FilePath("/test/video.mp4"),
-            media_type=MediaType.VIDEO
-        )
-        assert video_file.get_processing_priority() == 1
-
-class TestTranscript:
-    """Unit tests for Transcript domain entity."""
-
-    def test_empty_transcript_detection(self):
-        empty_content = TranscriptContent("")
-        transcript = Transcript(
-            transcript_id="test-1",
-            content=empty_content,
-            source=mock_media_file
-        )
-        assert transcript.is_empty() is True
-
-    def test_study_material_generation_eligibility(self):
-        content = TranscriptContent("Valid transcript content")
-        transcript = Transcript(
-            transcript_id="test-2",
-            content=content,
-            source=mock_media_file
-        )
-        transcript.status = ProcessingStatus.COMPLETED
-        assert transcript.can_generate_study_material() is True
-```
-
-**Value Object Tests**:
-
-```python
-class TestMediaType:
-    """Unit tests for MediaType value object."""
-
-    @pytest.mark.parametrize("extension,expected", [
-        (".mp4", MediaType.VIDEO),
-        (".mp3", MediaType.AUDIO),
-        (".txt", MediaType.TEXT),
-        (".png", MediaType.IMAGE),
-        (".unknown", None)
-    ])
-    def test_from_extension(self, extension, expected):
-        result = MediaType.from_extension(extension)
-        assert result == expected
-
-    def test_media_type_immutability(self):
-        video_type = MediaType.VIDEO
-        with pytest.raises(FrozenInstanceError):
-            video_type.name = "changed"
-```
-
-**Domain Service Tests**:
-
-```python
-class TestConflictResolver:
-    """Unit tests for ConflictResolver domain service."""
-
-    def test_resolve_naming_conflict_mixed_media(self):
-        primary_file = MediaFile(
-            file_id="primary",
-            path=FilePath("/test/lecture.mp4"),
-            media_type=MediaType.VIDEO
-        )
-        conflicting_image = MediaFile(
-            file_id="conflict",
-            path=FilePath("/test/lecture.png"),
-            media_type=MediaType.IMAGE
-        )
-
-        resolutions = ConflictResolver.resolve_naming_conflict(
-            primary_file, [conflicting_image]
-        )
-
-        assert resolutions[primary_file].name == "lecture.txt"
-        assert resolutions[conflicting_image].name == "lecture_images.txt"
-
-class TestFileGroupingStrategy:
-    """Unit tests for FileGroupingStrategy domain service."""
-
-    def test_group_by_stem_case_insensitive(self):
-        files = [
-            MediaFile("1", FilePath("/test/Lecture.mp4"), MediaType.VIDEO),
-            MediaFile("2", FilePath("/test/lecture.MP3"), MediaType.AUDIO),
-            MediaFile("3", FilePath("/test/LECTURE.png"), MediaType.IMAGE)
-        ]
-
-        groups = FileGroupingStrategy.group_by_stem(files)
-
-        assert "lecture" in groups
-        assert len(groups["lecture"]) == 3
-        # Verify priority ordering
-        assert groups["lecture"][0].media_type == MediaType.VIDEO
-```
-
-#### **Service Layer Testing**
-
-**Domain Service Tests with Mocks**:
-
-```python
-class TestAudioTranscriptionService:
-    """Unit tests for AudioTranscriptionService."""
-
-    def test_transcribe_audio_success(self, mock_whisper_service):
-        service = WhisperTranscriptionService(
-            whisper_client=mock_whisper_service,
-            config=test_config
-        )
-
-        media_file = MediaFile(
-            file_id="test-1",
-            path=FilePath("/test/audio.mp3"),
-            media_type=MediaType.AUDIO
-        )
-
-        mock_whisper_service.transcribe.return_value = "Test transcript"
-
-        transcript = service.transcribe(media_file)
-
-        assert isinstance(transcript, Transcript)
-        assert transcript.content.value == "Test transcript"
-        assert transcript.source == media_file
-        mock_whisper_service.transcribe.assert_called_once_with(media_file.path)
-
-    def test_transcribe_unsupported_media_type(self, mock_whisper_service):
-        service = WhisperTranscriptionService(
-            whisper_client=mock_whisper_service,
-            config=test_config
-        )
-
-        image_file = MediaFile(
-            file_id="test-2",
-            path=FilePath("/test/image.png"),
-            media_type=MediaType.IMAGE
-        )
-
-        with pytest.raises(DomainError, match="Cannot transcribe this media type"):
-            service.transcribe(image_file)
-```
-
-**Application Service Tests**:
-
-```python
-class TestTranscriptionOrchestrationService:
-    """Unit tests for TranscriptionOrchestrationService."""
-
-    def test_process_media_file_success(self, mock_transcription_service, mock_repository):
-        service = TranscriptionOrchestrationService(
-            transcription_service=mock_transcription_service,
-            repository=mock_repository
-        )
-
-        media_file = MediaFile(
-            file_id="test-1",
-            path=FilePath("/test/audio.mp3"),
-            media_type=MediaType.AUDIO
-        )
-
-        expected_transcript = Transcript(
-            transcript_id="transcript-1",
-            content=TranscriptContent("Test content"),
-            source=media_file
-        )
-
-        mock_transcription_service.transcribe.return_value = expected_transcript
-
-        result = service.process_media_file(media_file)
-
-        assert result == expected_transcript
-        mock_transcription_service.transcribe.assert_called_once_with(media_file)
-        mock_repository.save.assert_called_once_with(expected_transcript)
-```
-
-#### **Infrastructure Layer Testing**
-
-**Repository Tests**:
-
-```python
-class TestFileSystemMediaFileRepository:
-    """Integration tests for FileSystemMediaFileRepository."""
-
-    def test_find_by_directory_discovers_media_files(self, tmp_path):
-        # Create test files
-        (tmp_path / "video.mp4").touch()
-        (tmp_path / "audio.mp3").touch()
-        (tmp_path / "document.txt").touch()
-        (tmp_path / "image.png").touch()
-        (tmp_path / "unsupported.xyz").touch()
-
-        repository = FileSystemMediaFileRepository(test_config)
-        media_files = repository.find_by_directory(tmp_path)
-
-        assert len(media_files) == 4  # Excludes .xyz file
-
-        media_types = [f.media_type for f in media_files]
-        assert MediaType.VIDEO in media_types
-        assert MediaType.AUDIO in media_types
-        assert MediaType.TEXT in media_types
-        assert MediaType.IMAGE in media_types
-```
-
-#### **Integration Testing**
-
-**Service Integration Tests**:
-
-```python
-class TestTranscriptionWorkflow:
-    """Integration tests for complete transcription workflow."""
-
-    @pytest.mark.integration
-    def test_end_to_end_audio_transcription(self, tmp_path):
-        # Setup real Whisper service (or test double)
-        whisper_service = WhisperService(model_size="tiny")
-        repository = FileSystemMediaFileRepository(test_config)
-        transcription_service = WhisperTranscriptionService(whisper_service, test_config)
-        orchestration_service = TranscriptionOrchestrationService(
-            transcription_service=transcription_service,
-            repository=repository
-        )
-
-        # Create test audio file
-        audio_file_path = tmp_path / "test_audio.wav"
-        generate_test_audio_file(audio_file_path)
-
-        media_file = MediaFile(
-            file_id="test-1",
-            path=FilePath.from_path(audio_file_path),
-            media_type=MediaType.AUDIO
-        )
-
-        transcript = orchestration_service.process_media_file(media_file)
-
-        assert isinstance(transcript, Transcript)
-        assert not transcript.is_empty()
-        assert transcript.status == ProcessingStatus.COMPLETED
-```
-
-#### **End-to-End Testing**
-
-**CLI E2E Tests**:
-
-```python
-class TestCLIEndToEnd:
-    """End-to-end tests for CLI interface."""
-
-    @pytest.mark.e2e
-    def test_full_transcription_and_study_generation(self, tmp_path, runner):
-        # Setup test data
-        video_path = tmp_path / "lecture.mp4"
-        create_test_video_file(video_path)
-
-        # Run CLI command
-        result = runner.invoke([
-            "process", str(video_path),
-            "--output", str(tmp_path),
-            "--generate-study"
-        ])
-
-        assert result.exit_code == 0
-
-        # Verify outputs
-        transcript_path = tmp_path / "lecture.txt"
-        study_material_path = tmp_path / "lecture_study.pdf"
-
-        assert transcript_path.exists()
-        assert study_material_path.exists()
-
-        # Verify content
-        transcript_content = transcript_path.read_text()
-        assert len(transcript_content) > 0
-```
-
-#### **Test Coverage Goals**
-
-**Coverage Targets by Layer**:
-
-- **Domain Layer**: 95%+ coverage
-  - Entities: 100%
-  - Value Objects: 100%
-  - Domain Services: 90%+
-- **Service Layer**: 85%+ coverage
-  - Domain Services: 90%+
-  - Application Services: 85%+
-- **Infrastructure Layer**: 80%+ coverage
-  - Repositories: 85%+
-  - External Service Wrappers: 75%+
-- **Presentation Layer**: 70%+ coverage
-  - CLI Commands: 80%+
-  - API Endpoints: 75%+
-
-#### **Testing Tools and Infrastructure**
-
-**Core Testing Stack**:
-
-```python
-# pytest.ini
-[tool:pytest]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = [
-    "--cov=src",
-    "--cov-report=html",
-    "--cov-report=term-missing",
-    "--cov-fail-under=80"
-]
-markers = [
-    "unit: Unit tests (fast, no external dependencies)",
-    "integration: Integration tests (requires external services)",
-    "e2e: End-to-end tests (full workflow)",
-    "slow: Tests that take longer than 1 second"
-]
-```
-
-**Test Utilities**:
-
-```python
-# tests/fixtures.py
-@pytest.fixture
-def mock_whisper_service():
-    """Mock Whisper service for unit tests."""
-    with patch('src.services.whisper.WhisperService') as mock:
-        mock.transcribe.return_value = "Mock transcript content"
-        yield mock
-
-@pytest.fixture
-def test_media_file():
-    """Standard test media file."""
-    return MediaFile(
-        file_id="test-1",
-        path=FilePath("/test/audio.mp3"),
-        media_type=MediaType.AUDIO
-    )
-
-@pytest.fixture
-def tmp_path_with_media(tmp_path):
-    """Temporary directory with test media files."""
-    (tmp_path / "video.mp4").touch()
-    (tmp_path / "audio.mp3").touch()
-    (tmp_path / "image.png").touch()
-    return tmp_path
-```
-
-#### **Continuous Integration Testing**
-
-**GitHub Actions Workflow**:
-
-```yaml
-# .github/workflows/test.yml
-name: Test Suite
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [3.9, 3.10, 3.11]
-
-    services:
-      ollama:
-        image: ollama/ollama
-        ports:
-          - 11434:11434
-
-    steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
-
-    - name: Run unit tests
-      run: pytest -m "unit" --cov=src
-
-    - name: Run integration tests
-      run: pytest -m "integration"
-      env:
-        OLLAMA_HOST: http://localhost:11434
-
-    - name: Run E2E tests
-      run: pytest -m "e2e"
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-```
-
-#### **Test Coverage Benefits**
-
-**Immediate Benefits**:
-
-- ✅ **Regression Prevention**: Catch breaking changes early
-- ✅ **Refactoring Confidence**: Safely improve architecture
-- ✅ **Documentation**: Tests serve as living documentation
-- ✅ **Design Feedback**: Writing tests improves API design
-
-**Long-term Benefits**:
-
-- ✅ **Maintenance Efficiency**: Quickly identify and fix issues
-- ✅ **Team Velocity**: Reduce time spent on manual testing
-- ✅ **Code Quality**: Enforce consistent coding standards
-- ✅ **Architecture Evolution**: Safely implement SOA/DDD changes
-
----
-
-### **8. When to Apply SOA + DDD**
-
-**Consider SOA + DDD when:**
-
-- ✅ System is growing in complexity
-- ✅ Multiple teams are working on the codebase
-- ✅ Business rules are complex and frequently changing
-- ✅ You need to support multiple interfaces (CLI, API, Web)
-- ✅ You want to swap infrastructure components easily
-- ✅ You need better testability and maintainability
-
-**Current architecture is sufficient when:**
-
-- ✅ System is simple and stable
-- ✅ Single team maintains the codebase
-- ✅ Business rules are straightforward
-- ✅ Only one interface (CLI) is needed
-- ✅ Infrastructure is unlikely to change
-
----
-
-### **9. Planned Feature Enhancements**
-
-#### **9.1 AI Generated Content Marking System**
-
-To ensure transparency and proper attribution, all AI-generated content will be clearly marked with author identification and acknowledgments.
-
-##### **Watermark and Attribution System**
-
-**Core Requirements**:
-
-1. **AI Generation Watermark**: All generated PDFs will include a visible watermark identifying them as AI-generated content
-2. **Author Attribution Footer**: Every page will include `Ram Kumar, saas.expert.ram@gmail.com` in the footer
-3. **Acknowledgment Page**: A dedicated final page acknowledging the author and the utility script
-
-##### **Technical Implementation**
-
-**PDF Generation Service Enhancement**:
-
-```python
-class EnhancedPDFGenerationService(PDFGenerationService):
-    """Enhanced PDF generation with AI content marking."""
-
-    def __init__(self, config: PipelineConfig):
-        super().__init__(config)
-        self.author_info = AuthorInfo(
-            name="Ram Kumar",
-            email="saas.expert.ram@gmail.com"
-        )
-
-    def generate_study_material_pdf(
-        self,
-        study_material: StudyMaterial,
-        output_path: Path
-    ) -> PDF:
-        """Generate PDF with AI content marking."""
-
-        # Create base PDF
-        base_pdf = super().generate_study_material_pdf(
-            study_material, output_path
-        )
-
-        # Add AI marking and attribution
-        marked_pdf = self._add_ai_marking(base_pdf)
-        attributed_pdf = self._add_author_attribution(marked_pdf)
-        final_pdf = self._add_acknowledgment_page(attributed_pdf)
-
-        return final_pdf
-
-    def _add_ai_marking(self, pdf: PDF) -> PDF:
-        """Add AI-generated watermark to all pages."""
-        watermark_text = "AI Generated Content"
-
-        for page in pdf.pages:
-            page.add_watermark(
-                text=watermark_text,
-                position=WatermarkPosition.CENTER,
-                opacity=0.3,
-                rotation=45,
-                font_size=48,
-                color=Color.LIGHT_GRAY
-            )
-
-        return pdf
-
-    def _add_author_attribution(self, pdf: PDF) -> PDF:
-        """Add author attribution footer to all pages."""
-        footer_text = f"Ram Kumar, {self.author_info.email}"
-
-        for page in pdf.pages:
-            page.add_footer(
-                text=footer_text,
-                position=FooterPosition.BOTTOM_RIGHT,
-                font_size=10,
-                font_style=FontStyle.ITALIC,
-                color=Color.DARK_GRAY
-            )
-
-        return pdf
-
-    def _add_acknowledgment_page(self, pdf: PDF) -> PDF:
-        """Add acknowledgment page as the last page."""
-        acknowledgment_content = self._generate_acknowledgment_content()
-
-        acknowledgment_page = PDFPage(
-            content=acknowledgment_content,
-            page_number=len(pdf.pages) + 1
-        )
-
-        pdf.add_page(acknowledgment_page)
-        return pdf
-
-    def _generate_acknowledgment_content(self) -> str:
-        """Generate acknowledgment page content."""
-        return f"""
-# Acknowledgment
-
-This study material was generated using an automated utility script created by:
-
-**Ram Kumar**
-saas.expert.ram@gmail.com
-
-## About This Utility
-
-This Python-based system demonstrates advanced software engineering principles
-in media processing and AI-powered content generation. It seamlessly processes
-video, audio, text, and image files to create comprehensive learning materials
-including transcripts, summaries, glossaries, and practice questions.
-
-## Technical Features
-
-- **Multi-modal Media Processing**: Supports video, audio, text, and image inputs
-- **AI-Powered Content Generation**: Uses state-of-the-art language models
-- **Automated PDF Generation**: Creates professionally formatted study materials
-- **Intelligent Conflict Resolution**: Handles mixed media file scenarios
-- **Object-Oriented Architecture**: Clean, maintainable, and extensible design
-
-## Architecture Highlights
-
-- **Service-Oriented Design**: Loosely coupled, reusable services
-- **Domain-Driven Design**: Rich domain model with business logic encapsulation
-- **Comprehensive Testing**: High test coverage across all layers
-- **Error Handling**: Robust error management and recovery
-
----
-
-*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
-"""
-```
-
-**Domain Model Extensions**:
-
-```python
-@dataclass(frozen=True)
-class AuthorInfo:
-    """Value object representing author information."""
-    name: str
-    email: str
-
-    def get_attribution_text(self) -> str:
-        return f"{self.name}, {self.email}"
-
-@dataclass(frozen=True)
-class WatermarkConfig:
-    """Configuration for PDF watermarking."""
-    text: str = "AI Generated Content"
-    opacity: float = 0.3
-    rotation: int = 45
-    font_size: int = 48
-    color: str = "#CCCCCC"
-    position: str = "center"
-
-class AIMarkedPDF(PDF):
-    """PDF entity with AI-generated content marking."""
-
-    def __init__(
-        self,
-        base_pdf: PDF,
-        author_info: AuthorInfo,
-        watermark_config: WatermarkConfig
-    ):
-        super().__init__(base_pdf.path)
-        self.base_pdf = base_pdf
-        self.author_info = author_info
-        self.watermark_config = watermark_config
-        self._marked = False
-
-    def apply_ai_marking(self) -> None:
-        """Apply AI marking to the PDF."""
-        if self._marked:
-            return
-
-        self._add_watermark()
-        self._add_attribution_footer()
-        self._add_acknowledgment_page()
-        self._marked = True
-
-    def is_ai_marked(self) -> bool:
-        """Check if PDF has AI marking."""
-        return self._marked
-```
-
-            )
-            media_files.append(media_file)
-
-        return media_files
-```
-
-**File Type Extensions**:
-
-```python
-# Extend MediaType value object
-@dataclass(frozen=True)
-class MediaType:
-    """Immutable value object representing media type."""
-
-    name: str
-    extensions: Tuple[str, ...]
-
-    VIDEO = MediaType("video", (".mp4", ".mkv", ".avi", ".mov"))
-    AUDIO = MediaType("audio", (".mp3", ".wav", ".m4a", ".aac"))
-    TEXT = MediaType("text", (".txt",))
-    IMAGE = MediaType("image", (".png", ".jpg", ".jpeg", ".gif"))
-    PDF = MediaType("pdf", (".pdf",))  # New addition
-
-    @classmethod
-    def from_extension(cls, ext: str) -> Optional['MediaType']:
-        """Factory method: Create from file extension."""
-        ext_lower = ext.lower()
-        for media_type in [cls.VIDEO, cls.AUDIO, cls.TEXT, cls.IMAGE, cls.PDF]:
-            if ext_lower in media_type.extensions:
-                return media_type
-        return None
-```
-
-#### **Benefits of These Enhancements**
-
-**AI Content Marking Benefits**:
-
-- ✅ **Transparency**: Clear identification of AI-generated content
-- ✅ **Attribution**: Proper credit to the author/utility creator
-- ✅ **Professionalism**: Consistent branding and acknowledgment
-- ✅ **Traceability**: Easy identification of generated materials
-
-**PDF Processing Benefits**:
-
-- ✅ **Extended Capability**: Process existing learning materials
-- ✅ **Intelligent Filtering**: Skip AI-generated content to avoid loops
-- ✅ **Content Enrichment**: Extract value from existing PDFs
-- ✅ **Pipeline Integration**: Seamless integration with existing workflow
-
-#### **Implementation Priority**
-
-#### **Phase 1: AI Content Marking**
-
-1. Implement watermark and attribution system
-2. Add acknowledgment page generation
-3. Update PDF generation service
-4. Add domain model extensions
-
-#### **Phase 2: PDF Processing**
-
-1. Implement PDF text extraction service
-2. Create AI-generated PDF detection
-3. Integrate with existing media processing pipeline
-4. Add comprehensive testing
-
-#### **Phase 3: Integration and Testing**
-
-1. End-to-end workflow testing
-2. Performance optimization
-3. Error handling and edge cases
-4. Documentation updates
-
-#### **9.2 Relative Path Display Enhancement**
-
-Improve terminal output clarity by showing the directory context for processed files, especially during recursive traversal into subfolders.
-
-##### **Relative Path Tracking**
-
-**Core Requirements**:
-
-1. **Base Directory Context**: Consider the initial input folder provided by the user as the "base".
-2. **Relative Path Calculation**: Calculate and display folder paths relative to this base.
-3. **Traversal Logging**: Show the relative folder path before processing the batch of files contained within it.
-4. **Clean Batch Output**: Maintain clean terminal output while providing clear context for deep directory structures.
-
-##### **Technical Implementation**
-
-**Pipeline Enhancement**:
-
-```python
-class VideoTranscriptionPipeline:
-    # ... existing code ...
-
-    def process_directory(self, directory: Path) -> ProcessResult:
-        """Process directory tree with relative path awareness."""
-        base_dir = directory.resolve()
-
-        # ... discovery and processing logic ...
-
-    def _get_relative_path_label(self, current_dir: Path, base_dir: Path) -> str:
-        """Calculate relative path for display."""
-        try:
-            rel_path = current_dir.resolve().relative_to(base_dir)
-            if str(rel_path) == ".":
-                return "root"
-            return str(rel_path)
-        except ValueError:
-            return current_dir.name
-
-    def _log_folder_context(self, current_dir: Path, base_dir: Path):
-        """Log the current directory context being processed."""
-        rel_label = self._get_relative_path_label(current_dir, base_dir)
-        self.status_reporter.info(f"Entering folder: {rel_label}")
-```
-
-#### **Benefits**
-
-- ✅ **Context Awareness**: Users immediately know which part of a complex directory structure is being processed
-- ✅ **Improved Logging**: Better traceability for deep recursion
-- ✅ **Clean Output**: Standardizes how subfolders are announced in the terminal
-
----
-
-## Current Issues & Bug Fixes
-
-### **Progress Bar Completion Issue**
-
-#### **Problem Description**
-
-When processing multiple files, progress bars are sometimes left incomplete when the program moves to the next file. This creates a confusing user experience where:
-
-1. **Incomplete Progress Bars**: Previous file progress bars remain partially filled
-2. **No Error Indication**: Failed files don't show clear error status in red
-3. **Visual Confusion**: Users can't distinguish between completed, failed, and in-progress files
-
-#### **Current Behavior**
-```text
-[#########-------------------] file1.txt
-[##########------------------] file2.mp3
-[#######--------------------] file3.png
-```
-
-#### **Expected Behavior**
-```text
-[##########################] file1.txt
-[##########################] file2.mp3         Error: Transcription failed (Red colored text)
-[##########################] file3.png
-```
-
-#### **Root Cause Analysis**
-
-The issue is in the `ProgressReporter.complete_processing()` method in `src/utils/ui_utils.py`:
-
-1. **Missing Completion Call**: When errors occur, `complete_processing(False)` may not be called
-2. **Line Management**: Progress bars aren't properly cleared or marked as complete
-3. **Error Display**: Failed files don't get red error indicators on the progress line
-4. **State Management**: Progress state isn't properly reset between files
-
-#### **Proposed Solution**
-
-##### 1. Ensure Progress Completion
-
-```python
-# In pipeline.py - wrap all file processing with try/finally
-try:
-    self.progress_reporter.start_processing(file_name, steps)
-    # ... processing logic ...
-    self.progress_reporter.complete_processing(success=True)
-except Exception as e:
-    self.progress_reporter.complete_processing(success=False)
-    self.status_reporter.error(f"Failed to process {file_name}: {e}")
-    raise
-```
-
-##### 2. Enhanced Progress Display
-
-```python
-# In ui_utils.py - improve complete_processing method
-def complete_processing(self, success: bool = True) -> None:
-    if self.processing:
-        self._show_progress()
-
-        progress_line = f"[{self._get_progress_bar()}] {self.current_file}"
-
-        if success:
-            print(f"\r{progress_line}")
-        else:
-            # show failed step if available
-            step_name = self.steps[self.current_step] if self.current_step < len(self.steps) else "unknown step"
-            error_text = f"{progress_line} Error: {step_name} failed"
-            print(f"\r{ColorFormatter.error(error_text)}")
-
-        self.processing = False
-```
-
-##### 3. Error State Management
-
-```python
-# Add error state tracking to ProgressReporter
-def __init__(self, verbose: bool = False):
-    # ... existing init ...
-    self.error_message = None
-
-def set_error(self, message: str) -> None:
-    """Set error message for current file."""
-    self.error_message = message
-
-def complete_processing(self, success: bool = True) -> None:
-    if self.processing:
-        self._show_progress()
-
-        progress_line = f"[{self._get_progress_bar()}] {self.current_file}"
-
-        if success:
-            print(f"\r{progress_line}")
-        else:
-            step_name = self.steps[self.current_step] if self.current_step < len(self.steps) else "unknown step"
-            error_msg = self.error_message or f"{step_name} failed"
-            error_line = f"{progress_line} Error: {error_msg}"
-            print(f"\r{ColorFormatter.error(error_line)}")
-
-        self.processing = False
-        self.error_message = None
-```
-
-##### 4. Pipeline Integration
-
-```python
-# In pipeline.py - ensure proper error handling
-def process_single_source(self, source_path: Path, source_type: str) -> ProcessResult:
-    file_name = source_path.name
-    steps = PROCESSING_STEPS.get(source_type, ["processing"])
-
-    try:
-        self.progress_reporter.start_processing(file_name, steps)
-
-        # ... existing processing logic ...
-
-        self.progress_reporter.complete_processing(success=True)
-        return result
-
-    except Exception as e:
-        self.progress_reporter.set_error(str(e))
-        self.progress_reporter.complete_processing(success=False)
-        raise ProcessingError(f"Failed to process {file_name}: {e}")
-```
-
-#### **Implementation Steps**
-
-1. **Fix ProgressReporter** - Update `complete_processing()` to show completion status
-2. **Add Error Tracking** - Add error message storage and display
-3. **Update Pipeline** - Ensure proper try/finally blocks around all processing
-4. **Color Entire Line** - Use standard color for success, red for entire failure line
-5. **Hide Emojis** - Do not use checkboxes or extra symbols
-6. **Test Edge Cases** - Verify behavior with partial failures and interruptions
-
-#### **Files to Modify**
-
-- `src/utils/ui_utils.py` - Enhanced ProgressReporter class
-- `src/core/pipeline.py` - Proper error handling and progress completion
-- `tests/test_ui_utils.py` - Tests for progress bar completion (new file)
-
-#### **Benefits**
-
-- ✅ **Clear Status**: Users can see which files succeeded/failed
-- ✅ **Error Visibility**: Failed files show red error indicators
-- ✅ **Clean Interface**: Progress bars are properly completed or marked as failed
-- ✅ **Better UX**: No more confusing incomplete progress bars
-- ✅ **Debugging**: Error messages are visible on the progress line
-
-#### **Priority**: **High** - This is a user experience issue that affects the perceived reliability of the application
+**Key Principles**:
+
+1. **Dependency Inversion**: Domain layer has no infrastructure dependencies
+2. **Service Contracts**: Clear interfaces between all layers
+3. **Domain Events**: Loose coupling between aggregates via events
+4. **Repository Pattern**: Persistence abstracted behind repository interfaces
+5. **Value Objects**: Immutable objects for domain concepts
