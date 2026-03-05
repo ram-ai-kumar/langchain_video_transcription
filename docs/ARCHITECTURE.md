@@ -54,7 +54,7 @@ The command-line interface handles user interaction and application lifecycle:
   - **Argument Parsing**: Uses `argparse` for comprehensive CLI options
   - **Signal Handling**: Graceful shutdown on SIGINT/SIGTERM
   - **Configuration Management**: Creates `PipelineConfig` from CLI args and config files
-  - **Dependency Validation**: Checks for required tools (Whisper, Tesseract, Pandoc, LaTeX)
+  - **Dependency Validation**: Checks for required tools (Whisper, Tesseract, Pandoc, Tectonic)
   - **Error Handling**: User-friendly error messages and exit codes
 - **Key Features**:
   - Supports JSON configuration files
@@ -175,15 +175,14 @@ Generators handle output file creation:
   - Unicode support for special characters
   - Custom LaTeX header integration
 - **PDF Engines** (in order of preference):
-  1. **XeLaTeX**: Native Unicode support
-  2. **pdfLaTeX**: Enhanced with Unicode mappings
-  3. **Minimal Fallback**: Basic PDF without custom formatting
+  1. **Tectonic**: XeTeX-based engine with native Unicode support
+  2. **Minimal Fallback**: Basic PDF without custom formatting
 - **Methods**:
   - `generate_pdf()`: Main PDF generation with fallback logic
   - `_generate_with_engine()`: Generates PDF with specific engine
   - `_generate_minimal_fallback()`: Basic PDF generation
-  - `validate_dependencies()`: Checks Pandoc and LaTeX availability
-- **Dependencies**: `pandoc`, LaTeX distribution (XeLaTeX or pdfLaTeX)
+  - `validate_dependencies()`: Checks Pandoc and Tectonic availability
+- **Dependencies**: `pandoc`, `tectonic`
 
 ### 6. Utilities (`src/utils/`)
 
@@ -332,8 +331,7 @@ Study Material Generation
     └─ Write study material markdown
     ↓
 PDF Generation (optional)
-    ├─ Try XeLaTeX (Unicode support)
-    ├─ Fallback to pdfLaTeX (enhanced)
+    ├─ Try Tectonic (XeTeX-based, Unicode support)
     └─ Fallback to minimal PDF (basic)
     ↓
 Output Files
@@ -376,7 +374,7 @@ Output Files
 
 7. **Unicode Support**:
    - Handles special characters in PDFs
-   - Multiple LaTeX engine fallbacks
+   - Tectonic engine with native Unicode support
    - Encoding-aware file operations
 
 ## File Organization

@@ -20,8 +20,7 @@ The pipeline is designed as an **intelligent, modular sequence of transformation
 
 ## PDF Generation Strategy
 
-- **XeLaTeX**: Native Unicode support for Greek letters and special characters
-- **pdfLaTeX**: Enhanced with explicit Unicode character mappings
+- **Tectonic**: XeTeX-based engine with native Unicode support and automatic package management
 - **Minimal fallback**: Basic PDF generation without custom formatting
 
 Each stage:

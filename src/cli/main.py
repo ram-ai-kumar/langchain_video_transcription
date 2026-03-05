@@ -194,20 +194,12 @@ Examples:
             if config.generate_pdf:
                 print(ColorFormatter.warning("  Use --no-pdf to skip PDF generation"))
 
-        # Check LaTeX engines
-        latex_engines = ["xelatex", "pdflatex"]
-        latex_found = False
-        for engine in latex_engines:
-            try:
-                subprocess.run([engine, "--version"], check=True, capture_output=True)
-                print(ColorFormatter.success(f"✓ {engine} available"))
-                latex_found = True
-                break
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                continue
-
-        if not latex_found:
-            print(ColorFormatter.warning("⚠ No LaTeX engine found - PDF generation will fail"))
+        # Check Tectonic
+        try:
+            subprocess.run(["tectonic", "--version"], check=True, capture_output=True)
+            print(ColorFormatter.success("✓ Tectonic available"))
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            print(ColorFormatter.warning("⚠ Tectonic not found - PDF generation will fail"))
             if config.generate_pdf:
                 print(ColorFormatter.warning("  Use --no-pdf to skip PDF generation"))
 

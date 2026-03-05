@@ -1,20 +1,10 @@
 % Page geometry with standard margins
 \usepackage[a4paper,top=2.5cm,bottom=2.5cm,left=2.5cm,right=2.5cm]{geometry}
 
-% Font and typography with Unicode support
-\usepackage{ifxetex}
-\ifxetex
-  % XeLaTeX: Use modern, readable sans-serif font
-  \usepackage{fontspec}
-  \setmainfont{Arial}           % Widely available sans-serif font
-  \setsansfont{Arial}           % Consistent sans-serif for headings
-\else
-  % pdfLaTeX: Use reliable sans-serif fonts
-  \usepackage[utf8]{inputenc}
-  \usepackage[T1]{fontenc}
-  \usepackage{textcomp}
-  \usepackage{helvet}  % Helvetica - excellent sans-serif readability
-\fi
+% Font and typography with Unicode support (Tectonic uses XeTeX)
+\usepackage{fontspec}
+\setmainfont{Arial}           % Widely available sans-serif font
+\setsansfont{Arial}           % Consistent sans-serif for headings
 
 % Simple symbols instead of icons (more compatible)
 \usepackage{tikz}
@@ -24,27 +14,6 @@
 \usepackage{amsmath,amssymb}  % Math symbols including Greek letters
 \usepackage{gensymb}  % Additional symbols
 \usepackage{mathrsfs}  % Math script fonts
-
-% Alternative Unicode handling for problematic characters (pdfLaTeX only)
-\ifxetex
-  % XeLaTeX doesn't need these
-\else
-  \DeclareUnicodeCharacter{03C3}{\sigma}  % Greek sigma
-  \DeclareUnicodeCharacter{03C4}{\tau}   % Greek tau
-  \DeclareUnicodeCharacter{03B1}{\alpha} % Greek alpha
-  \DeclareUnicodeCharacter{03B2}{\beta}  % Greek beta
-  \DeclareUnicodeCharacter{03B3}{\gamma} % Greek gamma
-  \DeclareUnicodeCharacter{03B4}{\delta} % Greek delta
-  \DeclareUnicodeCharacter{03B5}{\epsilon} % Greek epsilon
-  \DeclareUnicodeCharacter{03B8}{\theta} % Greek theta
-  \DeclareUnicodeCharacter{03BB}{\lambda} % Greek lambda
-  \DeclareUnicodeCharacter{03BC}{\mu} % Greek mu
-  \DeclareUnicodeCharacter{03C0}{\pi} % Greek pi
-  \DeclareUnicodeCharacter{03C1}{\rho} % Greek rho
-  \DeclareUnicodeCharacter{03C6}{\phi} % Greek phi
-  \DeclareUnicodeCharacter{03C8}{\psi} % Greek psi
-  \DeclareUnicodeCharacter{03C9}{\omega} % Greek omega
-\fi
 
 \usepackage{microtype}  % Improves typography
 
@@ -102,9 +71,35 @@
   rulecolor=\color{subheadingcolor}
 }
 
-% Tables
+% Tables with text wrapping and proper column widths
 \usepackage{booktabs}
 \usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{calc}
+
+% Increase row height for readability
+\renewcommand{\arraystretch}{1.4}
+
+% Allow text wrapping in table cells by default
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1}}
+
+% Force Pandoc longtables to use full width and wrap text
+\usepackage{etoolbox}
+\AtBeginEnvironment{longtable}{\footnotesize}
+\makeatletter
+\let\oldlt\longtable
+\let\endoldlt\endlongtable
+\def\longtable{\@ifnextchar[\longtable@i \longtable@ii}
+\def\longtable@i[#1]{\begin{oldlt}[#1]}
+\def\longtable@ii{\begin{oldlt}[c]}
+\def\endlongtable{\end{oldlt}}
+\makeatother
+
+% Prevent table columns from overflowing page margins
+\setlength{\tabcolsep}{4pt}
 
 % Links
 \usepackage{hyperref}

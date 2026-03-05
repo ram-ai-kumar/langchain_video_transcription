@@ -1,4 +1,4 @@
-"""PDF generator for converting markdown to PDF using Pandoc."""
+"""PDF generator for converting markdown to PDF using Pandoc and Tectonic."""
 
 import subprocess
 from pathlib import Path
@@ -10,7 +10,7 @@ from src.processors.base import ProcessResult
 
 
 class PDFGenerator:
-    """Handles PDF generation using Pandoc and LaTeX."""
+    """Handles PDF generation using Pandoc and Tectonic."""
     
     def __init__(self, config: PipelineConfig):
         self.config = config
@@ -25,19 +25,15 @@ class PDFGenerator:
             # Ensure output directory exists
             pdf_path.parent.mkdir(parents=True, exist_ok=True)
             
-            # Try different LaTeX engines in order of preference
-            engines = ["xelatex", "pdflatex"]
+            # Generate using Tectonic engine
+            try:
+                result = self._generate_with_engine(markdown_path, pdf_path, "tectonic")
+                if result.success:
+                    return result
+            except PDFGenerationError:
+                pass
             
-            for engine in engines:
-                try:
-                    result = self._generate_with_engine(markdown_path, pdf_path, engine)
-                    if result.success:
-                        return result
-                except PDFGenerationError:
-                    # Try next engine
-                    continue
-            
-            # If all engines failed, try minimal fallback
+            # If Tectonic failed, try minimal fallback
             return self._generate_minimal_fallback(markdown_path, pdf_path)
             
         except Exception as e:
@@ -82,6 +78,7 @@ class PDFGenerator:
             "pandoc",
             str(markdown_path),
             "-o", str(pdf_path),
+            "--from", "markdown+lists_without_preceding_blankline",
             f"--pdf-engine={engine}",
             f"--include-in-header={str(self.header_path)}",
             "--variable", "fontsize=12pt",
@@ -89,9 +86,7 @@ class PDFGenerator:
             "--toc-depth=3",
             "--number-sections",
             "--fail-if-warnings=false",
-            "--log=INFO",
-            "--pdf-engine-opt=-interaction=nonstopmode",
-            "--pdf-engine-opt=-shell-escape"
+            "--log=INFO"
         ]
         
         return base_cmd
@@ -103,10 +98,10 @@ class PDFGenerator:
                 "pandoc",
                 str(markdown_path),
                 "-o", str(pdf_path),
-                "--pdf-engine=pdflatex",
+                "--from", "markdown+lists_without_preceding_blankline",
+                "--pdf-engine=tectonic",
                 "--variable", "fontsize=12pt",
-                "--fail-if-warnings=false",
-                "--pdf-engine-opt=-interaction=nonstopmode"
+                "--fail-if-warnings=false"
             ]
             
             subprocess.run(cmd, check=True, capture_output=True, text=True)
@@ -152,16 +147,12 @@ class PDFGenerator:
             # Check if pandoc is available
             subprocess.run(["pandoc", "--version"], check=True, capture_output=True)
             
-            # Check if at least one LaTeX engine is available
-            engines = ["xelatex", "pdflatex"]
-            for engine in engines:
-                try:
-                    subprocess.run([engine, "--version"], check=True, capture_output=True)
-                    return True
-                except (subprocess.CalledProcessError, FileNotFoundError):
-                    continue
-            
-            return False
+            # Check if Tectonic is available
+            try:
+                subprocess.run(["tectonic", "--version"], check=True, capture_output=True)
+                return True
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                return False
             
         except (subprocess.CalledProcessError, FileNotFoundError):
             return False
@@ -178,13 +169,11 @@ class PDFGenerator:
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
         
-        # Check LaTeX engines
-        engines = ["xelatex", "pdflatex", "lualatex"]
-        for engine in engines:
-            try:
-                subprocess.run([engine, "--version"], check=True, capture_output=True)
-                info["latex_engines"].append(engine)
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                continue
+        # Check Tectonic
+        try:
+            subprocess.run(["tectonic", "--version"], check=True, capture_output=True)
+            info["latex_engines"].append("tectonic")
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
         
         return info

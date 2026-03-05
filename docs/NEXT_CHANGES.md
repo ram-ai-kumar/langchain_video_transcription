@@ -37,7 +37,7 @@ logger.info("Processing %s", audio_path)
 
 ### **2. Testing Infrastructure & CI/CD**
 
-**Current State**: Minimal testing — only `test_ai_marking.py` exists; no CI/CD pipeline
+**Current State**: No tests exist yet; no CI/CD pipeline
 
 **Required Actions**:
 
@@ -97,13 +97,12 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ### **4. Populate the `src/domain/` Layer**
 
-**Current State**: `src/domain/` only contains `__init__.py`; business logic is scattered across processors and the pipeline
+**Current State**: `src/domain/` does not exist; business logic is scattered across processors and the pipeline
 
 **Required Actions**:
 
 - Create `TranscriptDocument` value object
 - Create `StudyMaterial` aggregate
-- Move `AIMarkingConfig` / `WatermarkConfig` from `pdf_generator.py` into domain
 - Extract file-grouping and conflict-resolution business rules from `pipeline.py` into domain services
 - Ensure the domain layer has zero infrastructure dependencies
 
@@ -295,9 +294,9 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **15. Clarify or Populate `src/domain/` Naming**
+### **15. Clarify `src/domain/` Naming**
 
-**Current State**: The directory is labeled `domain/` (DDD language) but `src/core/pipeline.py` is doing the actual domain orchestration; `src/domain/` is empty
+**Current State**: The directory is labeled `domain/` (DDD language) but `src/core/pipeline.py` is doing the actual domain orchestration; `src/domain/` doesn't exist yet
 
 **Required Actions**:
 
