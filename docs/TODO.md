@@ -8,34 +8,7 @@ This document describes **planned improvements and architecture evolution** for 
 
 ## **Critical Improvements (Immediate Priority)**
 
-### **1. Replace `print()` with the `logging` Module**
-
-**Current State**: Every processor and utility uses bare `print()` statements throughout the codebase
-
-**Required Actions**:
-
-- Adopt `logging.getLogger(__name__)` in every module
-- Wire `--verbose` CLI flag to log levels (`DEBUG`, `INFO`, `WARNING`, `ERROR`)
-- Add a single root logger configuration in `src/core/pipeline.py` at startup
-- Remove all bare `print()` calls from processors, generators, and utilities
-
-**Example**:
-
-```python
-# Before
-print(f"Processing {audio_path}...")
-
-# After
-import logging
-logger = logging.getLogger(__name__)
-logger.info("Processing %s", audio_path)
-```
-
-**Impact**: Makes output filterable and redirectable; critical for debugging batch runs and production deployments
-
----
-
-### **2. Testing Infrastructure & CI/CD**
+### **1. Testing Infrastructure & CI/CD**
 
 **Current State**: No tests exist yet; no CI/CD pipeline
 
@@ -64,7 +37,7 @@ logger.info("Processing %s", audio_path)
 
 ---
 
-### **3. Async / Parallel File Processing**
+### **2. Async / Parallel File Processing**
 
 **Current State**: Sequential processing — 10 independent lecture videos block each other
 
@@ -95,7 +68,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **4. Populate the `src/domain/` Layer**
+### **3. Populate the `src/domain/` Layer**
 
 **Current State**: `src/domain/` does not exist; business logic is scattered across processors and the pipeline
 
@@ -110,7 +83,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **5. Configuration Validation with Pydantic**
+### **4. Configuration Validation with Pydantic**
 
 **Current State**: `PipelineConfig` is a plain `@dataclass` — invalid values (e.g., `whisper_model="huge"`) fail late in the pipeline with cryptic errors
 
@@ -142,7 +115,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ## **Medium-Term Enhancements**
 
-### **6. Temporary File Cleanup**
+### **5. Temporary File Cleanup**
 
 **Current State**: Audio extracted from video (`.wav`/`.mp3` temp files) is not guaranteed to be cleaned up when processing fails mid-run
 
@@ -162,7 +135,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **7. LLM Connection Reuse + Retry**
+### **6. LLM Connection Reuse + Retry**
 
 **Current State**: A new `OllamaLLM` instance is created per file; `tenacity` is already in `requirements.txt` but unused
 
@@ -183,7 +156,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **8. Error Handling & Resilience**
+### **7. Error Handling & Resilience**
 
 **Current State**: Basic exception handling with custom types; transient failures abort processing
 
@@ -197,7 +170,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **9. Security & Input Validation**
+### **8. Security & Input Validation**
 
 **Current State**: Basic file existence checks only
 
@@ -212,7 +185,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **10. Code Quality & Developer Experience**
+### **9. Code Quality & Developer Experience**
 
 **Current State**: Good structure but missing tooling; type hints exist but are not enforced
 
@@ -239,7 +212,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ## **Nice-to-Have / Polish**
 
-### **11. OCR Quality Improvement**
+### **10. OCR Quality Improvement**
 
 **Current State**: Raw `pytesseract.image_to_string()` with default config gives poor results on lecture slides with dark backgrounds or small fonts
 
@@ -253,7 +226,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **12. Whisper Model Caching Across Runs**
+### **11. Whisper Model Caching Across Runs**
 
 **Current State**: The Whisper model is loaded once per pipeline invocation but reloaded on every new run, which is slow
 
@@ -267,7 +240,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **13. Study Prompt Versioning**
+### **12. Study Prompt Versioning**
 
 **Current State**: `config/study_prompt.txt` is a flat text file with no version metadata; impossible to tell which prompt version produced which study material
 
@@ -281,7 +254,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **14. Dependency Management with `pip-compile`**
+### **13. Dependency Management with `pip-compile`**
 
 **Current State**: `requirements.txt` lists 54 packages, many of which are transitive dependencies mixed with direct ones
 
@@ -294,7 +267,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **15. Clarify `src/domain/` Naming**
+### **14. Clarify `src/domain/` Naming**
 
 **Current State**: The directory is labeled `domain/` (DDD language) but `src/core/pipeline.py` is doing the actual domain orchestration; `src/domain/` doesn't exist yet
 
@@ -307,7 +280,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **16. Enhanced CLI Features**
+### **15. Enhanced CLI Features**
 
 **Current State**: Comprehensive but some user experience gaps
 
@@ -321,7 +294,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **17. Plugin Architecture**
+### **16. Plugin Architecture**
 
 **Proposed Enhancement**: Allow custom processors and generators via a plugin system
 
@@ -339,7 +312,7 @@ class PluginManager:
 
 ---
 
-### **18. REST API Interface**
+### **17. REST API Interface**
 
 **Proposed Enhancement**: Web interface for remote processing
 
@@ -362,7 +335,7 @@ async def get_job_status(job_id: str):
 
 ---
 
-### **19. Database Integration**
+### **18. Database Integration**
 
 **Proposed Enhancement**: Metadata storage and search capabilities
 
@@ -377,7 +350,7 @@ async def get_job_status(job_id: str):
 
 ---
 
-### **20. Advanced PDF Features**
+### **19. Advanced PDF Features**
 
 **Proposed Enhancement**: Enhanced PDF generation with more customization
 
