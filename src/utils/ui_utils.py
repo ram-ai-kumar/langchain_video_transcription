@@ -1,5 +1,6 @@
 """UI utility functions for user interface and progress display."""
 
+import logging
 import sys
 import time
 import threading
@@ -25,6 +26,7 @@ class ProgressReporter:
         self.steps = []
         self.processing = False
         self.bar_width = 28  # Fixed width inside brackets
+        self.logger = logging.getLogger(__name__)
 
     def start_processing(self, file_path: str, steps: list) -> None:
         """Start processing a file with given steps."""
@@ -50,10 +52,12 @@ class ProgressReporter:
             self._show_progress()
 
             # Move to next line for next file
-            print()
+            sys.stdout.write("\n")
+            sys.stdout.flush()
 
             # If error, show error message
             if not success:
+                self.logger.error("Processing failed for %s", self.current_file)
                 print(ColorFormatter.error(f"[{self._get_progress_bar()}] {self.current_file} Error: Processing failed"))
 
             self.processing = False
@@ -151,6 +155,7 @@ class StatusReporter:
 
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
+        self.logger = logging.getLogger(__name__)
 
     def info(self, message: str, prefix: str = "[INFO]") -> None:
         """Report info message."""

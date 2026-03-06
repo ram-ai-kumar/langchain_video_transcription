@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
+from src.core.exceptions import ConfigurationError
+
 
 @dataclass
 class PipelineConfig:

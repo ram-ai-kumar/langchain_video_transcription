@@ -1,5 +1,6 @@
 """Audio processor for transcribing audio files using Whisper."""
 
+import logging
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -17,6 +18,7 @@ class AudioProcessor(BaseProcessor):
     def __init__(self, config: PipelineConfig):
         super().__init__(config)
         self.model: Optional[whisper.Whisper] = None
+        self.logger = logging.getLogger(__name__)
 
     def can_process(self, file_path: Path) -> bool:
         """Check if processor can handle the file type."""

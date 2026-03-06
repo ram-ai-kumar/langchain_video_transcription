@@ -1,13 +1,18 @@
 """Command-line interface for the video transcription pipeline."""
 
 import argparse
+import logging
 import signal
 import sys
+import warnings
 from pathlib import Path
+
+# Suppress Python 3.14 compatibility warnings early
+warnings.filterwarnings("ignore", category=UserWarning, message=".*Core Pydantic V1 functionality isn't compatible with Python 3.14.*")
 
 from src.core.config import PipelineConfig
 from src.core.exceptions import VideoTranscriptionError
-from src.core.pipeline import VideoTranscriptionPipeline
+from src.core.pipeline import VideoTranscriptionPipeline, setup_logging
 from src.utils.ui_utils import ColorFormatter, StatusReporter
 
 
@@ -222,6 +227,12 @@ Examples:
         parser = self.create_parser()
         args = parser.parse_args(args)
 
+        # Setup logging immediately after parsing args
+        setup_logging(args.verbose)
+
+        # Now create logger after logging is configured
+        self.logger = logging.getLogger(__name__)
+
         # Create configuration
         config = self.create_config(args)
         self.status_reporter = StatusReporter(config.verbose)
@@ -285,10 +296,8 @@ Examples:
             print(ColorFormatter.error(f"Processing failed: {e}"))
             sys.exit(1)
         except Exception as e:
+            self.logger.exception("Unexpected error: %s", e)
             print(ColorFormatter.error(f"Unexpected error: {e}"))
-            if config.verbose:
-                import traceback
-                traceback.print_exc()
             sys.exit(1)
 
 

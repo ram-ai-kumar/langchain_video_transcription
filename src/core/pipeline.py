@@ -1,5 +1,7 @@
 """Main pipeline orchestrator for video transcription and study material generation."""
 
+import logging
+import sys
 from pathlib import Path
 from typing import List, Dict, Optional, Set
 import whisper
@@ -16,12 +18,54 @@ from src.utils.ui_utils import ProgressReporter, StatusReporter, PROCESSING_STEP
 from src.utils.media_utils import MediaTypeDetector, MediaProcessorFactory
 
 
+def setup_logging(verbose: bool = False) -> None:
+    """Configure application-wide logging.
+
+    Args:
+        verbose: If True, set log level to DEBUG; otherwise INFO
+    """
+    # Determine log level based on verbosity
+    log_level = logging.DEBUG if verbose else logging.INFO
+
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+
+    # Clear existing handlers to avoid duplicates
+    root_logger.handlers.clear()
+
+    # Add console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(log_level)
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
+
+    # Suppress noisy third-party loggers
+    logging.getLogger('whisper').setLevel(logging.ERROR)
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    logging.getLogger('langchain').setLevel(logging.WARNING)
+    logging.getLogger('langchain_core').setLevel(logging.WARNING)
+    logging.getLogger('httpx').setLevel(logging.WARNING)
+    logging.getLogger('httpcore').setLevel(logging.WARNING)
+
+    # Suppress Python 3.14 compatibility warnings
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning, message=".*Core Pydantic V1 functionality isn't compatible with Python 3.14.*")
+
+
 class VideoTranscriptionPipeline:
     """Main pipeline coordinator that manages the entire processing workflow."""
 
     def __init__(self, config: PipelineConfig):
         self.config = config
         self.whisper_model: Optional[whisper.Whisper] = None
+        self.logger = logging.getLogger(__name__)
 
         # Initialize components
         self.file_discovery = FileDiscovery(config)
@@ -345,6 +389,9 @@ class VideoTranscriptionPipeline:
         # Check study generator prerequisites
         study_validation = self.study_generator.validate_prerequisites()
         validation.update(study_validation)
+
+        # Compute overall readiness
+        validation["overall_ready"] = all(validation.values())
 
         return validation
 
