@@ -45,10 +45,10 @@ Thumbs.db
 # Transcripts
 *.txt
 
-# Summaries and study material (except in root and docs)
-*.md
-!/*.md
-!docs/*.md
+# # Summaries and study material (except in root and docs)
+# *.md
+# !/*.md
+# !docs/*.md
 
 # Generated PDFs
 *.pdf
