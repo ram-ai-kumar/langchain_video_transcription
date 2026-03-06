@@ -8,9 +8,9 @@ This document describes **planned improvements and architecture evolution** for 
 
 ## **Critical Improvements (Immediate Priority)**
 
-### **1. Testing Infrastructure & CI/CD**
+### **1. Testing Infrastructure**
 
-**Current State**: No tests exist yet; no CI/CD pipeline
+**Current State**: No tests exist yet
 
 **Required Actions**:
 
@@ -27,11 +27,6 @@ This document describes **planned improvements and architecture evolution** for 
   - Configuration validation tests
   - File utility and media detection tests
 - **Implement test fixtures** for temporary files and mock models
-- **Add GitHub Actions CI/CD** (`.github/workflows/ci.yml`):
-  - Run `pytest` on every push and pull request
-  - Run `ruff` or `flake8` linting
-  - Run `mypy` type checking
-  - Enforce minimum 60% code coverage
 
 **Impact**: Essential for code reliability and enabling safe refactoring
 
@@ -110,6 +105,8 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 - Support YAML/TOML config files alongside JSON
 
 **Impact**: Catches bad inputs at startup with clear error messages instead of mid-pipeline crashes
+
+---
 
 ---
 
@@ -360,6 +357,22 @@ async def get_job_status(job_id: str):
 - Interactive elements (bookmarks, internal hyperlinks)
 - Batch PDF generation with a master table of contents
 - PDF optimization for different use cases (print vs. screen)
+
+---
+
+## **CI/CD Pipeline**
+
+**Current State**: No CI/CD pipeline
+
+**Required Actions**:
+
+- **Add GitHub Actions CI/CD** (`.github/workflows/ci.yml`):
+  - Run `pytest` on every push and pull request
+  - Run `ruff` or `flake8` linting
+  - Run `mypy` type checking
+  - Enforce minimum 60% code coverage
+
+**Impact**: Automated quality checks and reliable deployment process
 
 ---
 
