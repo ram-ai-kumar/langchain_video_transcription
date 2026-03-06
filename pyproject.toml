@@ -1,0 +1,54 @@
+[tool.pytest]
+addopts = ["--strict-markers", "--disable-warnings", "--tb=short"]
+testpaths = ["tests"]
+python_files = ["src"]
+markers = [
+    "unit: Unit tests for individual components",
+    "integration: Integration tests for workflow testing",
+    "smoke: Smoke tests for critical path validation",
+    "processor: Tests for audio/image processors",
+    "cli: Tests for command-line interface",
+    "config: Tests for configuration management",
+    "utils: Tests for utility functions",
+    "ui: Tests for user interface components",
+    "media: Tests for media type detection",
+    "ocr: Tests for OCR functionality",
+    "security: Security and input validation tests",
+    "negative: Negative test cases and edge conditions",
+    "zta: Zero Tolerance Architecture tests",
+    "reliability: System reliability and resilience tests",
+    "slow: Tests that take longer to run",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*", "*/test_*", "*/conftest.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+]
+fail_under = 60
+
+[tool.ruff]
+line-length = 88
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501", # Line too long (handled by formatter)
+    "F401", # Imported but unused (false positives in tests)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false

@@ -1,0 +1,19 @@
+name = "video-transcription"
+version = "0.1.0"
+description = "Video transcription and study material generator"
+authors = [{name = "Video Transcription Team"}]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "openai-whisper>=20240927",
+    "pytesseract>=0.3.13",
+    "pillow>=12.1.1",
+    "langchain-core>=1.2.17",
+    "langchain-ollama>=1.0.1",
+    "ffmpeg-python>=0.2.0",
+    "pydantic>=2.12.5",
+    "tenacity>=9.1.4",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0"
+]
