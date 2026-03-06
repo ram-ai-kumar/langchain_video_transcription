@@ -22,21 +22,31 @@ This section contains documentation about system features and capabilities.
   - Plugin development
   - Extension points
 
+- **[ENTERPRISE_READINESS.md](./ENTERPRISE_READINESS.md)** - Enterprise and government readiness
+  - Security & Zero Trust Architecture (ZTA)
+  - Compliance standards (OWASP, CIS, PCI DSS)
+  - AI & Machine Learning security
+  - Institutional & government deployment
+  - Enterprise architecture and scalability
+
 ## 🎯 **Who Should Read This**
 
 ### **End Users**
+
 - Understanding available features
 - Choosing appropriate options
 - Customizing behavior
 - Maximizing productivity
 
 ### **System Administrators**
+
 - Feature configuration
 - User support guidance
 - Performance tuning
 - Integration planning
 
 ### **Developers**
+
 - Feature implementation details
 - Extension development
 - Custom behavior creation
