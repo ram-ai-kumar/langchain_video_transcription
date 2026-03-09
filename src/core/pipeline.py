@@ -379,11 +379,11 @@ class VideoTranscriptionPipeline:
         """Validate that all prerequisites are met."""
         validation = {}
 
-        # Check Whisper model availability
+        # Check Whisper availability without loading the model
         try:
-            self._load_whisper_model()
+            import whisper
             validation["whisper_model"] = True
-        except Exception:
+        except ImportError:
             validation["whisper_model"] = False
 
         # Check study generator prerequisites

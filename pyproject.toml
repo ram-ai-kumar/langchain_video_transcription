@@ -1,7 +1,7 @@
 [tool.pytest]
 addopts = ["--strict-markers", "--disable-warnings", "--tb=short"]
 testpaths = ["tests"]
-python_files = ["src"]
+python_files = ["test_*.py"]
 markers = [
     "unit: Unit tests for individual components",
     "integration: Integration tests for workflow testing",

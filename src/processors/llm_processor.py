@@ -101,12 +101,31 @@ class LLMProcessor(BaseProcessor):
             )
 
     def validate_llm_connection(self) -> bool:
-        """Validate that the LLM is accessible and working."""
+        """Validate that the LLM is accessible without loading it into memory."""
         try:
-            llm = self._load_llm()
-            # Simple test invocation
-            response = llm.invoke("Test")
-            return len(response) > 0
+            import urllib.request
+            import json
+            import os
+            
+            # Default to localhost:11434 if not configured via environment
+            ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+            req = urllib.request.Request(f"{ollama_url}/api/tags")
+            
+            with urllib.request.urlopen(req, timeout=5) as response:
+                if response.status != 200:
+                    return False
+                
+                data = json.loads(response.read().decode('utf-8'))
+                models = [model.get("name") for model in data.get("models", [])]
+                
+                # Check if requested model exists
+                model_name = self.config.llm_model
+                # Handle possible tag omissions (e.g. user asks for gemma3 but ollama has gemma3:latest)
+                if model_name not in models and f"{model_name}:latest" not in models:
+                    # Model not pulled
+                    return False
+                    
+            return True
         except Exception:
             return False
 
