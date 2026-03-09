@@ -46,9 +46,10 @@ The result is a system that demonstrates not only technical execution but also t
 
 ## Getting Started
 
-1. **Prerequisites**: Install Python, ffmpeg, Tesseract, Pandoc, Tectonic, and Ollama — [Prerequisites](docs/setup/PREREQUISITES.md).
+1. **Prerequisites**: Install Python, ffmpeg, Tesseract, Pandoc, Tectonic, and Ollama — [Prerequisites](docs/setup/PREREQUISITES.md). (Or use Docker to skip system dependencies!)
 2. **Setup**: Clone the repo, create a virtual environment, and install dependencies — [Setup](docs/setup/SETUP.md).
 3. **Run**: `python main.py /path/to/media` — see [Running the Pipeline](docs/usage/RUNNING_THE_PIPELINE.md) and [Usage](docs/usage/USAGE.md) for CLI options.
+   - **Docker Run**: `docker compose run --rm transcriber /data/your-media-file.mp4`
 4. **Advanced Usage**: `python main.py /path/to/media --llm-model llama3 --no-pdf --verbose` — see [Usage](docs/usage/USAGE.md) for all CLI options.
 
 ---

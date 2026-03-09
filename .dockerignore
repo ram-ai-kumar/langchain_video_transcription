@@ -1,0 +1,56 @@
+# Environment
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Byte-compiled
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Tests & Caches
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+
+# Git
+.git/
+.gitignore
+.github/
+
+# IDEs
+.idea/
+.vscode/
+.claude/
+.cursor/
+*.swp
+*.swo
+
+# Project specific
+tmp/
+temp/
+docs/
+tests/
+logs/
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.mp3
+*.wav
+*.m4a
+*.aac
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.txt
+*.pdf
+*.md

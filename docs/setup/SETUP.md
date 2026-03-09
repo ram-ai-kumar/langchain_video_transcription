@@ -53,3 +53,25 @@
    ```bash
    ollama pull gemma3
    ```
+
+## Option 3: Docker (Zero-Install)
+
+If you don't want to install system prerequisites like `ffmpeg` or manage Python virtual environments, you can use the provided Docker setup.
+
+1. **Clone the repository**
+
+   ```bash
+   git clone <this-repo-url> video_transcription
+   cd video_transcription
+   ```
+
+2. **Ensure Ollama is running**
+   - The container expects Ollama to be available on your host machine to leverage local hardware.
+   - Make sure you've pulled your desired model: `ollama pull gemma3`
+
+3. **Run the pipeline**
+   - The Docker Compose configuration automatically mounts your local directory so the project can access media files and output results inside the current folder.
+
+   ```bash
+   docker compose run --rm transcriber /data/your-media-file.mp4
+   ```
