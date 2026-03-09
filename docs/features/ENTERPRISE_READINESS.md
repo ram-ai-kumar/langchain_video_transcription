@@ -33,7 +33,7 @@ Implemented security patterns following Zero Trust principles:
 - **41+ Security Test Methods**: Covering all attack vectors
 - **70+ Attack Scenarios**: Comprehensive threat modeling
 - **OWASP Top 10 Compliance**: 5/10 categories actively covered
-- **Continuous Security Validation**: Automated security testing in CI/CD
+- **On-Demand Security Validation**: Manual security testing via CI/CD workflows
 
 ### **Attack Prevention**
 

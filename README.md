@@ -141,7 +141,7 @@ video_transcription/
 - **Code Coverage**: 60%+ minimum threshold
 - **Security Coverage**: 70+ attack scenarios tested
 - **Compliance Standards**: OWASP, CIS, PCI DSS
-- **CI/CD Pipeline**: Automated testing and quality gates
+- **CI/CD Pipeline**: On-demand manual testing and quality gates via GitHub Actions
 
 ### **Running Tests**
 
@@ -296,7 +296,7 @@ Comprehensive documentation organized by purpose and audience:
 - **Code Quality**: Ruff linting and formatting
 - **Testing**: Comprehensive test suite with security focus
 - **Documentation**: Complete technical and user documentation
-- **CI/CD**: Automated testing and quality gates
+- **CI/CD**: On-demand manual testing and quality gates via GitHub Actions
 - **Best Practices**: Industry-standard development patterns
 
 ### **Quality Metrics**

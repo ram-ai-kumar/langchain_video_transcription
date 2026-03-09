@@ -86,6 +86,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 - Migrate `PipelineConfig` to `pydantic.BaseModel`
 - Add field-level validators:
+
   ```python
   from pydantic import BaseModel, field_validator
 
@@ -101,6 +102,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
               raise ValueError(f"Invalid whisper model '{v}'. Choose from: {sorted(valid)}")
           return v
   ```
+
 - Add environment variable support for sensitive settings
 - Support YAML/TOML config files alongside JSON
 
@@ -119,6 +121,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 **Required Actions**:
 
 - Wrap audio extraction in a context manager or `try/finally` block:
+
   ```python
   import tempfile
 
@@ -126,6 +129,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
       extract_audio(video_path, tmp.name)
       transcribe(tmp.name)
   ```
+
 - Audit all temporary file creation paths and ensure cleanup in failure scenarios
 
 **Impact**: Prevents disk space accumulation from repeated failed runs
@@ -140,6 +144,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 - Instantiate `OllamaLLM` once at pipeline startup and pass it through to all processors
 - Add retry with exponential backoff for LLM calls:
+
   ```python
   from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -147,6 +152,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
   def generate_study_material(self, content: str) -> str:
       return self.chain.invoke({"content": content})
   ```
+
 - Add a circuit breaker to stop retrying if Ollama is clearly unavailable
 
 **Impact**: Reduces connection overhead for batch runs; prevents transient LLM failures from aborting the pipeline
@@ -189,6 +195,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 **Required Actions**:
 
 - Add `pyproject.toml` to consolidate version, tool configuration, and metadata:
+
   ```toml
   [tool.pytest.ini_options]
   testpaths = ["tests"]
@@ -199,6 +206,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
   [tool.ruff]
   line-length = 100
   ```
+
 - Add pre-commit hooks: `ruff`, `mypy`, `pytest`
 - Add code coverage reporting with minimum thresholds
 - Create contributor development guide
@@ -362,15 +370,13 @@ async def get_job_status(job_id: str):
 
 ## **CI/CD Pipeline**
 
-**Current State**: No CI/CD pipeline
+**Current State**: Manual GitHub Actions CI/CD pipeline exists (`.github/workflows/ci.yml`)
 
 **Required Actions**:
 
-- **Add GitHub Actions CI/CD** (`.github/workflows/ci.yml`):
-  - Run `pytest` on every push and pull request
-  - Run `ruff` or `flake8` linting
-  - Run `mypy` type checking
-  - Enforce minimum 60% code coverage
+- **Configure triggers** if continuous execution is desired (currently set to manual `workflow_dispatch` only)
+- Evaluate running `pytest` and linters on a specific cadence rather than per-push
+- Enforce minimum 60% code coverage
 
 **Impact**: Automated quality checks and reliable deployment process
 
