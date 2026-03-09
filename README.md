@@ -192,6 +192,7 @@ Comprehensive documentation organized by purpose and audience:
 
 ### **🔒 Security & Compliance**
 
+- [**Security By Design**](docs/architecture/SECURITY_BY_DESIGN.md) — Core security principles and architecture
 - [**Security Testing Documentation**](tests/docs/SECURITY_TESTING_DOCUMENTATION.md) — Comprehensive security testing guide
 - [**Security Compliance Summary**](tests/docs/SECURITY_COMPLIANCE_SUMMARY.md) — Security standards compliance
 - [**Testing Documentation**](tests/docs/TESTING_DOCUMENTATION.md) — Complete testing guide
