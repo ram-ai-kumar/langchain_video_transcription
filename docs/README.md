@@ -89,16 +89,17 @@ Welcome to the comprehensive documentation for the video transcription system. T
 
 ### **System Administrators**
 
-1. **Setup Guide**: Follow `setup/SETUP.md` for deployment
-2. **Migration Guide**: Use `setup/MIGRATION.md` for upgrades
-3. **Usage Examples**: Check `usage/RUNNING_THE_PIPELINE.md`
-4. **Media Support**: Review `usage/SUPPORTED_MEDIA_TYPES.md`
+1. **Setup Guide**: Follow `setup/SETUP.md` for `.venv` vs `Docker` deployment options
+2. **Containerization**: Use `docker compose run` for a zero-install footprint
+3. **Migration Guide**: Use `setup/MIGRATION.md` for upgrades
+4. **Usage Examples**: Check `usage/RUNNING_THE_PIPELINE.md`
+5. **Media Support**: Review `usage/SUPPORTED_MEDIA_TYPES.md`
 
 ### **Enterprise & Government Users**
 
 1. **Security Documentation**: Review security testing documentation in `tests/docs/`
 2. **Compliance Standards**: Check OWASP, CIS, and PCI DSS compliance
-3. **Deployment Guide**: Follow setup and architecture guides
+3. **Deployment Guide**: Choose between secure local installations or containerized deployment
 4. **Architecture Review**: Study system architecture for enterprise deployment
 
 ## 🔍 **Finding Information**

@@ -21,6 +21,8 @@
 - **Enhanced PDF Generation**: PDF generation using Tectonic (XeTeX-based, with native Unicode support) → Minimal fallback.
 - **Standard Footer**: Developer attribution and "AI-generated" content notice in PDF footers.
 - **Unicode Support**: Handles Greek letters, special characters, and international symbols in PDFs.
+- **Docker Support (Zero-Install)**: Run the pipeline via a clean Docker container, eliminating the need to install host dependencies like `ffmpeg`, `tesseract`, or `pandoc`.
+- **Optimized Resource Usage**: Models (Whisper and Ollama) are strictly lazy-loaded into VRAM only at the exact moment their specific processing tasks (e.g. audio transcription or chapter generation) begin.
 - **Smart File Naming**: Conflict-aware naming for mixed media (`{stem}_images.txt` for conflicts, `{stem}.txt` for clean cases).
 - **CLI Experience**: Clean, readable progress updates with dynamic pipeline paths and spinners.
 - **Comprehensive CLI Options**: Full command-line interface with configuration files, dependency checking, and validation modes.

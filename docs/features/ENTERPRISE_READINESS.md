@@ -68,6 +68,7 @@ Implemented security patterns following Zero Trust principles:
 ### **Resource Protection**
 
 - **Memory Limits**: Configurable memory usage limits
+- **Lazy Loading Models**: Heavy AI models (LLMs and Whisper) are strictly loaded into VRAM on-demand to optimize resource saturation and startup performance.
 - **File Size Limits**: Maximum file size enforcement
 - **Timeout Controls**: Configurable operation timeouts
 - **Concurrent Access**: Thread-safe operations with limits
@@ -133,7 +134,7 @@ Implemented security patterns following Zero Trust principles:
 - **Complete Local Processing**: All functionality available offline
 - **No External Dependencies**: Core functionality without internet
 - **Data Center Ready**: Designed for data center deployment
-- **Container Support**: Docker and Kubernetes deployment options
+- **Container Support**: Full Docker and Docker Compose environment provided out-of-the-box
 
 ### **Air-Gapped Operation**
 

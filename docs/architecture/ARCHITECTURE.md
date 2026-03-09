@@ -106,7 +106,7 @@ Processors implement the **Strategy Pattern** for handling different media types
 - **Capabilities**:
   - Extracts audio from video using `ffmpeg` subprocess
   - Transcribes audio using OpenAI Whisper
-  - Lazy model loading (loads only when needed)
+  - **Lazy Model Loading**: The heavy Whisper model is strictly loaded into memory only when an audio transcription request is actively made, saving VRAM during purely text or image workloads.
 - **Methods**:
   - `process()`: Transcribes audio to text
   - `extract_audio_from_video()`: Extracts audio stream from video
@@ -142,10 +142,10 @@ Processors implement the **Strategy Pattern** for handling different media types
 - **Capabilities**:
   - Generates study materials using LangChain + Ollama
   - Loads prompt templates from external files
-  - Validates LLM connectivity
+  - **Zero-Footprint Validation**: Validates LLM availability via a lightweight HTTP ping (`/api/tags`) to Ollama, meaning the model weights are never loaded into VRAM during dependency checks.
 - **Methods**:
   - `process()`: Generates study material from transcript
-  - `validate_llm_connection()`: Tests LLM availability
+  - `validate_llm_connection()`: Tests LLM availability (without inference/booting the model)
   - `get_model_info()`: Returns model configuration
 - **Dependencies**: `langchain-core`, `langchain-ollama`
 - **Architecture**: Uses LangChain's `RunnableSequence` to chain prompt template with LLM
@@ -405,6 +405,11 @@ src/
 └── cli/                     # Command-line interface
     └── main.py              # CLI implementation
 ```
+
+## Deployment & Execution Options
+
+1. **Local Virtual Environment (`.venv`)**: Ideal for developers. Requires manual installation of `ffmpeg`, `Tesseract`, `Pandoc`, and `Tectonic`.
+2. **Containerized (Docker Compose)**: Zero-install option. The `transcriber` container encapsulates all complex system binary dependencies, mounting the host filesystem for media access. Ollama remains on the host to properly leverage local GPU acceleration seamlessly.
 
 ## Extension Points
 
