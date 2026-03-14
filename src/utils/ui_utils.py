@@ -83,6 +83,10 @@ class ProgressReporter:
         if self.total_steps == 0:
             return "-" * self.bar_width
 
+        # Ensure 100% completion when all steps are done
+        if self.current_step >= self.total_steps:
+            return "#" * self.bar_width
+
         percentage = (self.current_step / self.total_steps)
         completed_chars = int(self.bar_width * percentage)
         remaining_chars = self.bar_width - completed_chars
