@@ -213,10 +213,8 @@ class VideoTranscriptionPipeline:
             # Determine transcript filename
             stem = group_key.split("::")[-1] if "::" in group_key else group_key
 
-            if stem in self.processed_stems:
-                transcript_file = directory / f"{stem}_images.txt"
-            else:
-                transcript_file = directory / f"{stem}.txt"
+            # Use the unified transcript file; ImageProcessor will append if it exists
+            transcript_file = directory / f"{stem}.txt"
 
             try:
                 # Process images to transcript
@@ -266,7 +264,7 @@ class VideoTranscriptionPipeline:
 
         for dir_path, images in dir_groups.items():
             folder_name = dir_path.name
-            transcript_file = dir_path / f"{folder_name}_images.txt"
+            transcript_file = dir_path / f"{folder_name}.txt"
 
             try:
                 # Process images to transcript

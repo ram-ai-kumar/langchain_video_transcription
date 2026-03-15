@@ -61,8 +61,11 @@ class ImageProcessor(BaseProcessor):
             # Combine all extracted text
             combined_text = "\n\n".join(all_text)
 
-            # Write to output file
-            with open(output_path, "w", encoding="utf-8") as f:
+            # Write to output file (append if it exists to merge with audio transcripts)
+            mode = "a" if output_path.exists() else "w"
+            with open(output_path, mode, encoding="utf-8") as f:
+                if mode == "a":
+                    f.write("\n\n--- Image OCR Extraction ---\n\n")
                 f.write(combined_text)
 
             # Prepare result message

@@ -119,10 +119,9 @@ class FileDiscovery:
             "pdf_file": dir_path / f"{base}.pdf"
         }
 
-        # Special handling for image groups
-        if start_type == "images":
-            paths["transcript_file"] = dir_path / f"{base}_images.txt"
-
+        # Special handling for image groups is no longer needed; 
+        # image OCR text will be appended to the base transcript file.
+        
         return paths
 
     def _is_supported_file(self, file_path: Path) -> bool:
