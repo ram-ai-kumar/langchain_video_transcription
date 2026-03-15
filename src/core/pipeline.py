@@ -302,11 +302,10 @@ class VideoTranscriptionPipeline:
 
                     if not result.success:
                         return result
+                    self.progress_reporter.next_step()
                 else:
                     self.status_reporter.info(f"Audio file already exists: {paths['audio_file'].name}")
-
-                # Move to next step
-                self.progress_reporter.next_step()
+                    self.progress_reporter.next_step(skipped=True)
 
             # EARLY EXIT: target == "audio"
             if self.config.target == "audio":
@@ -338,7 +337,7 @@ class VideoTranscriptionPipeline:
                 self.progress_reporter.next_step()
             else:
                 if start_type in ["video", "audio"]:
-                    self.progress_reporter.next_step()
+                    self.progress_reporter.next_step(skipped=True)
 
             # EARLY EXIT: target == "text"
             if self.config.target == "text":
@@ -359,7 +358,7 @@ class VideoTranscriptionPipeline:
                 # Move to next step
                 self.progress_reporter.next_step()
             else:
-                self.progress_reporter.next_step()
+                self.progress_reporter.next_step(skipped=True)
 
             # EARLY EXIT: target == "markdown"
             if self.config.target == "markdown":
@@ -381,7 +380,9 @@ class VideoTranscriptionPipeline:
                         self.status_reporter.error(
                             f"PDF generation failed for {source_path.name}: {pdf_result.message}"
                         )
-                self.progress_reporter.next_step()
+                    self.progress_reporter.next_step()
+                else:
+                    self.progress_reporter.next_step(skipped=True)
 
             return ProcessResult(
                 success=True,

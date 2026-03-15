@@ -23,6 +23,7 @@ class ProgressReporter:
         self.current_file = ""
         self.current_step = 0
         self.total_steps = 0
+        self.skipped_steps = 0
         self.steps = []
         self.processing = False
         self.bar_width = 28  # Fixed width inside brackets
@@ -34,31 +35,42 @@ class ProgressReporter:
         self.steps = steps
         self.total_steps = len(steps)
         self.current_step = 0
+        self.skipped_steps = 0
         self.processing = True
 
         # Show initial progress line
         self._show_progress()
 
-    def next_step(self) -> None:
+    def next_step(self, skipped: bool = False) -> None:
         """Move to next step."""
         if self.processing and self.current_step < self.total_steps:
             self.current_step += 1
+            if skipped:
+                self.skipped_steps += 1
             self._show_progress()
 
     def complete_processing(self, success: bool = True) -> None:
         """Complete processing."""
         if self.processing:
-            # Show final progress
-            self._show_progress()
+            # Clear the current line
+            sys.stdout.write("\r" + " " * 120 + "\r")
+            
+            # Determine if the entire file processing was skipped
+            is_skipped = success and self.skipped_steps > 0 and self.skipped_steps == self.current_step
+            
+            # Fill the remaining steps if successful (handles early target exits)
+            if success and self.current_step < self.total_steps:
+                self.current_step = self.total_steps
 
-            # Move to next line for next file
-            sys.stdout.write("\n")
-            sys.stdout.flush()
+            progress_bar = self._get_progress_bar()
 
-            # If error, show error message
             if not success:
                 self.logger.error("Processing failed for %s", self.current_file)
-                print(ColorFormatter.error(f"[{self._get_progress_bar()}] {self.current_file} Error: Processing failed"))
+                print(ColorFormatter.error(f"[{progress_bar}] ✗ {self.current_file} (Failed)"))
+            elif is_skipped:
+                print(ColorFormatter.warning(f"[{progress_bar}] ⏭  {self.current_file} (Skipped)"))
+            else:
+                print(ColorFormatter.success(f"[{progress_bar}] ✓ {self.current_file}"))
 
             self.processing = False
 
