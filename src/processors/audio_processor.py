@@ -30,7 +30,12 @@ class AudioProcessor(BaseProcessor):
             try:
                 # Load Whisper model
                 import torch
-                device = "cuda" if torch.cuda.is_available() else "cpu"
+                if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                    device = "mps"
+                elif torch.cuda.is_available():
+                    device = "cuda"
+                else:
+                    device = "cpu"
                 import warnings
                 import os
                 import logging
