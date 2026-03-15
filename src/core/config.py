@@ -17,6 +17,7 @@ class PipelineConfig:
 
     # Output settings
     generate_pdf: bool = True
+    target: str = "pdf"
     output_dir: Optional[Path] = None
 
     # File extensions

@@ -299,17 +299,19 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **16. Enhanced CLI Features**
+### **16. Enhanced CLI Features & Interactive Prompts**
 
-**Current State**: Comprehensive but some user experience gaps
+**Current State**: Comprehensive but some user experience gaps. The pipeline currently always processes to completion (PDF) unless specific skip flags (`--no-pdf`) are used.
 
 **Required Actions**:
 
-- Add dry-run mode (`--dry-run`) for previewing operations without processing
-- Add interactive configuration wizard for first-time users
-- Improve progress bars with ETA estimates for long transcription jobs
+- **Dynamic Output Target (`--target` or `-t`)**: Allow users to explicitly define the extraction point where the pipeline should stop (e.g., `audio`, `text`, `markdown`, `pdf`).
+  - *Example*: `python main.py /path/media.mp4 --target text` will extract text and immediately skip LLM processing.
+- **Interactive Fallback Prompt**: If the pipeline is launched without a `--target` argument, prompt the user interactively (e.g., "What is the desired output target? [audio/text/markdown/pdf]: ") before proceeding.
+- Add dry-run mode (`--dry-run`) for previewing operations without processing.
+- Improve progress bars with ETA estimates for long transcription jobs.
 
-**Impact**: Better user experience and reduced configuration errors
+**Impact**: Saves significant compute time and VRAM context when users only need intermediate artifacts, and vastly improves the interactive user experience.
 
 ---
 

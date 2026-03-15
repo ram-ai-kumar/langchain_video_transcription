@@ -310,6 +310,15 @@ class VideoTranscriptionPipeline:
                 # Move to next step
                 self.progress_reporter.next_step()
 
+            # EARLY EXIT: target == "audio"
+            if self.config.target == "audio":
+                return ProcessResult(
+                    success=True,
+                    output_path=paths["audio_file"] if start_type == "video" else source_path,
+                    message=f"Reached target 'audio' for {source_path.name}",
+                    metadata={"source_type": start_type, "target_reached": "audio"}
+                )
+
             # Step 2: Transcribe (if we have audio but no transcript)
             if not paths["transcript_file"].exists():
                 if start_type in ["video", "audio"] or paths["audio_file"].exists():
@@ -333,6 +342,15 @@ class VideoTranscriptionPipeline:
                 if start_type in ["video", "audio"]:
                     self.progress_reporter.next_step()
 
+            # EARLY EXIT: target == "text"
+            if self.config.target == "text":
+                return ProcessResult(
+                    success=True,
+                    output_path=paths["transcript_file"],
+                    message=f"Reached target 'text' for {source_path.name}",
+                    metadata={"source_type": start_type, "target_reached": "text"}
+                )
+
             # Step 3: Generate study material
             if not paths["study_file"].exists():
                 result = self.study_generator.generate(paths["transcript_file"])
@@ -344,6 +362,15 @@ class VideoTranscriptionPipeline:
                 self.progress_reporter.next_step()
             else:
                 self.progress_reporter.next_step()
+
+            # EARLY EXIT: target == "markdown"
+            if self.config.target == "markdown":
+                return ProcessResult(
+                    success=True,
+                    output_path=paths["study_file"],
+                    message=f"Reached target 'markdown' (study material) for {source_path.name}",
+                    metadata={"source_type": start_type, "target_reached": "markdown"}
+                )
 
             # Step 4: Generate PDF (if requested and not already present)
             if self.config.generate_pdf:
