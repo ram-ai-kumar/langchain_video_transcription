@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, patch
 from typing import Dict, Any
 
 # Test fixtures
@@ -86,3 +86,9 @@ def sample_file_group(temp_dir):
         ]
     }
     return group
+
+@pytest.fixture(autouse=True)
+def mock_global_input():
+    """Globally mock builtins.input to prevent interactive prompts from hanging the test suite."""
+    with patch('builtins.input', return_value="4"):
+        yield

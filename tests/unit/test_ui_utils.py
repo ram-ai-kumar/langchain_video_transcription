@@ -38,6 +38,18 @@ class TestProgressReporter:
             assert reporter.total_steps == 3
             assert reporter.processing is True
 
+    def test_start_processing_with_prefix(self):
+        """Test starting processing with a tree prefix."""
+        reporter = ProgressReporter(verbose=True)
+        steps = ["audio"]
+        
+        captured_output = io.StringIO()
+        with patch('sys.stdout', captured_output):
+            reporter.start_processing("file.txt", steps, prefix="├── ")
+            
+            assert reporter.current_prefix == "├── "
+            assert reporter.processing is True
+
     def test_next_step(self):
         """Test moving to next step."""
         reporter = ProgressReporter(verbose=True)
@@ -49,9 +61,10 @@ class TestProgressReporter:
         reporter.next_step()
         assert reporter.current_step == 1
 
-        # Move to final step
-        reporter.next_step()
+        # Move to final step with skip true
+        reporter.next_step(skipped=True)
         assert reporter.current_step == 2
+        assert reporter.skipped_steps == 1
 
     def test_complete_processing_success(self):
         """Test successful processing completion."""
@@ -64,6 +77,21 @@ class TestProgressReporter:
             reporter.complete_processing(success=True)
 
             assert not reporter.processing
+            assert "✓" in captured_output.getvalue()
+
+    def test_complete_processing_skipped(self):
+        """Test processing completion when skipped idempotently."""
+        reporter = ProgressReporter(verbose=True)
+        steps = ["audio"]
+        
+        captured_output = io.StringIO()
+        with patch('sys.stdout', captured_output):
+            reporter.start_processing("file.txt", steps)
+            reporter.next_step(skipped=True)
+            reporter.complete_processing(success=True)
+            
+            assert "⏭" in captured_output.getvalue()
+            assert "(Skipped)" in captured_output.getvalue()
 
     def test_complete_processing_failure(self):
         """Test processing completion with failure."""
