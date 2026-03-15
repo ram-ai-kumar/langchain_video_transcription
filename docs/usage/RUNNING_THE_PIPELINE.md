@@ -19,17 +19,23 @@
    python main.py ./data
    ```
 
-3. **Optional: skip PDF generation**
+3. **Interactive Prompt or Explicit Targets**
+   - If you run the command above, the CLI will **interact and prompt you** for your desired destination format. You can avoid loading heavy AI models entirely if you just need Transcripts!
+   - To bypass the prompt and run automatically, explicitly define your target using the `--target` (`-t`) flag:
 
    ```bash
-   python main.py ./data --no-pdf
+   # Skip formatting and exit cleanly with raw text records:
+   python main.py ./data --target text
+   
+   # Or extract to markdown without rendering Heavy PDFs:
+   python main.py ./data --target markdown
    ```
 
 4. **Inspect outputs**
    - For each logical item, you will find:
-     - A transcript: `<name>.txt` or `<name>_images.txt` for image groups
-     - A study guide (Markdown): `<name>_study.md` or `<name>_images_study.md`
-     - A PDF (if enabled and Pandoc/LaTeX are installed): `<name>.pdf` or `<name>_images.pdf`
+     - A transcript: `<name>.txt` (Image OCR is cleanly appended to existings transcripts)
+     - A study guide (Markdown): `<name>_study.md`
+     - A PDF (if enabled and Pandoc/LaTeX are installed): `<name>.pdf`
 
 5. **Re-running is safe**
    - The pipeline is **idempotent**: existing artifacts are reused, and only missing pieces are generated.

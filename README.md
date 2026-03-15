@@ -26,8 +26,9 @@ We employ a "never trust, always verify" standard for every component, ensuring 
 ### 3. Enterprise Scalability & Performance
 Scale AI workloads efficiently without exponential infrastructure costs.
 - **Resource Optimization**: Implements lazy loading of heavy AI models into VRAM strictly on-demand, reducing baseline infrastructure overhead.
+- **Dynamic Workload Targeting**: The pipeline implements conditional early extraction capabilities (`--target`), allowing users to stop at intermediary artifacts (Audio, Transcripts, Markdown), bypassing unnecessary compute cycles.
 - **Containerized Agility**: Full Docker deployment guarantees zero footprint on host machines and predictable execution across environments.
-- **Concurrent Processing architecture**: Engineered to handle bulk media processing efficiently utilizing multi-threaded worker pools.
+- **Concurrent Processing Architecture**: Engineered to handle bulk media processing efficiently utilizing multi-threaded worker pools.
 
 ---
 
