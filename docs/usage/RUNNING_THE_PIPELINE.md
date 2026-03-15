@@ -39,4 +39,5 @@
 
 5. **Re-running is safe**
    - The pipeline is **idempotent**: existing artifacts are reused, and only missing pieces are generated.
+   - If an artifact is skipped due to existing on disk, the terminal will cleanly report it as `[⏭ Skipped]`. 
    - Mixed media processing is deterministic and conflict-free.

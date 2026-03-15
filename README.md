@@ -28,6 +28,7 @@ Scale AI workloads efficiently without exponential infrastructure costs.
 - **Resource Optimization**: Implements lazy loading of heavy AI models into VRAM strictly on-demand, reducing baseline infrastructure overhead.
 - **Dynamic Workload Targeting**: The pipeline implements conditional early extraction capabilities (`--target`), allowing users to stop at intermediary artifacts (Audio, Transcripts, Markdown), bypassing unnecessary compute cycles.
 - **Containerized Agility**: Full Docker deployment guarantees zero footprint on host machines and predictable execution across environments.
+- **Idempotent UI & State Tracking**: The pipeline visually tracks skipped elements (`[⏭ Skipped]`) when processing overlapping media sets or directory subtrees, avoiding redundant heavy extraction.
 - **Concurrent Processing Architecture**: Engineered to handle bulk media processing efficiently utilizing multi-threaded worker pools.
 
 ---
