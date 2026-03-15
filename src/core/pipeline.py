@@ -214,9 +214,17 @@ class VideoTranscriptionPipeline:
             stem = group_key.split("::")[-1] if "::" in group_key else group_key
 
             # Use the unified transcript file; ImageProcessor will append if it exists
-            transcript_file = directory / f"{stem}.txt"
+            # Ensure it generates in the exact directory of the image files (resolves subtree bug)
+            target_dir = image_files[0].parent
+            transcript_file = target_dir / f"{stem}.txt"
 
             try:
+                # Get processing steps for this file type
+                steps = PROCESSING_STEPS.get("image", ["transcript", "study_material", "pdf"])
+
+                # Start progress display for this file
+                self.progress_reporter.start_processing(transcript_file.name, steps)
+
                 # Process images to transcript
                 if not transcript_file.exists():
                     self.status_reporter.info(f"Processing images: {stem}/ ({len(image_files)} images)")
@@ -224,10 +232,16 @@ class VideoTranscriptionPipeline:
 
                     if not result.success:
                         self.status_reporter.error(f"Failed to process images for {stem}: {result.message}")
+                        self.progress_reporter.complete_processing(False)
                         continue
+                else:
+                    self.progress_reporter.next_step(skipped=True)
 
                 # Process transcript to study material
                 result = self.process_single_source(transcript_file, "images")
+
+                # Complete progress display
+                self.progress_reporter.complete_processing(result.success)
 
                 if result.success:
                     processed_count += 1
@@ -236,6 +250,7 @@ class VideoTranscriptionPipeline:
                     self.status_reporter.error(f"Failed to process study material for {stem}: {result.message}")
 
             except Exception as e:
+                self.progress_reporter.complete_processing(False)
                 self.status_reporter.error(f"Error processing images for {stem}: {e}")
 
         return processed_count
@@ -267,6 +282,12 @@ class VideoTranscriptionPipeline:
             transcript_file = dir_path / f"{folder_name}.txt"
 
             try:
+                # Get processing steps for this file type
+                steps = PROCESSING_STEPS.get("image", ["transcript", "study_material", "pdf"])
+
+                # Start progress display for this file
+                self.progress_reporter.start_processing(transcript_file.name, steps)
+
                 # Process images to transcript
                 if not transcript_file.exists():
                     self.status_reporter.info(f"Processing loose images: {folder_name}/ ({len(images)} images)")
@@ -274,10 +295,16 @@ class VideoTranscriptionPipeline:
 
                     if not result.success:
                         self.status_reporter.error(f"Failed to process loose images in {folder_name}: {result.message}")
+                        self.progress_reporter.complete_processing(False)
                         continue
+                else:
+                    self.progress_reporter.next_step(skipped=True)
 
                 # Process transcript to study material
                 result = self.process_single_source(transcript_file, "images")
+
+                # Complete progress display
+                self.progress_reporter.complete_processing(result.success)
 
                 if result.success:
                     processed_count += 1
@@ -285,6 +312,7 @@ class VideoTranscriptionPipeline:
                     self.status_reporter.error(f"Failed to process study material for loose images in {folder_name}: {result.message}")
 
             except Exception as e:
+                self.progress_reporter.complete_processing(False)
                 self.status_reporter.error(f"Error processing loose images in {folder_name}: {e}")
 
         return processed_count

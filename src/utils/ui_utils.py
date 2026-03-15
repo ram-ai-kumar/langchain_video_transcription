@@ -85,9 +85,9 @@ class ProgressReporter:
         # Generate progress bar
         progress_bar = self._get_progress_bar()
 
-        # Show on same line
+        # Show on same line; pad with spaces to ensure old text is cleared properly
         progress_line = f"[{progress_bar}] {self.current_file}"
-        sys.stdout.write(f"\r{progress_line}")
+        sys.stdout.write(f"\r{progress_line:<100}")
         sys.stdout.flush()
 
     def _get_progress_bar(self) -> str:

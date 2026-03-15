@@ -55,10 +55,8 @@ class FileDiscovery:
 
             # Add to overall groups with directory context
             for stem, file_list in dir_groups.items():
-                # Create unique key combining directory and stem
-                group_key = str(current_dir.relative_to(directory)) + "::" + stem
-                if str(current_dir.relative_to(directory)) == ".":
-                    group_key = stem
+                # Create unique key using the absolute path to correctly map subdirectories
+                group_key = f"{current_dir.resolve()}::{stem}"
                 groups[group_key] = sorted(file_list, key=lambda f: f.name.lower())
 
         return groups
