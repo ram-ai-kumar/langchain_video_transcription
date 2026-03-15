@@ -1,16 +1,24 @@
-# Video Transcription System Documentation
+# Video Transcription System: Internal Documentation Index
 
-Welcome to the comprehensive documentation for the video transcription system. This directory contains organized documentation covering all aspects of the system, including enterprise-ready features, security, compliance, and AI capabilities.
+Welcome to the central documentation hub. This directory contains detailed architectural, configuration, and security documentation.
+
+If you are evaluating the platform from a high-level business or compliance perspective, please refer to the [**Main README**](../README.md).
 
 ## 📚 **Documentation Structure**
 
-### **🏗️ Architecture** (`architecture/`)
+### **🏗️ Executive & Architecture** (`architecture/`)
 
-- **[ARCHITECTURE.md](./architecture/ARCHITECTURE.md)** - Comprehensive system architecture overview
-- **[PROCESSING_ARCHITECTURE.md](./architecture/PROCESSING_ARCHITECTURE.md)** - Detailed processing pipeline architecture
+For evaluating system posture, compliance, and design patterns:
 
-### **⚡ Features** (`features/`)
+- **[Security & Compliance](./architecture/SECURITY_AND_COMPLIANCE.md)** - GRC, SOC 2 / ISO mappings, audit criteria, and Zero Trust features.
+- **[Enterprise Scalability](./architecture/ENTERPRISE_SCALABILITY.md)** - Scaling logic, Dockerization, concurrency, and model lazy-loading mechanisms.
+- **[Security by Design](./architecture/SECURITY_BY_DESIGN.md)** - Implementation details of Zero Trust Architecture.
+- **[ARCHITECTURE.md](./architecture/ARCHITECTURE.md)** - Comprehensive system architecture overview.
+- **[PROCESSING_ARCHITECTURE.md](./architecture/PROCESSING_ARCHITECTURE.md)** - Detailed processing pipeline architecture.
 
+### **⚡ Features & Security** (`features/`)
+
+- **[OWASP Top 10 for LLMs](./features/OWASP_LLM_TOP_10.md)** - Mitigation and defense against AI-specific threat vectors.
 - **[FEATURES.md](./features/FEATURES.md)** - Core features and capabilities
 - **[ADVANCED_FEATURES.md](./features/ADVANCED_FEATURES.md)** - Advanced features and extensions
 - **[CUSTOMIZATION.md](./features/CUSTOMIZATION.md)** - Customization options and configurations
@@ -37,90 +45,31 @@ Welcome to the comprehensive documentation for the video transcription system. T
 
 - **[TODO.md](./reference/TODO.md)** - Project roadmap and task tracking
 
-## 🚀 **Enterprise-Ready Features**
+## 🎯 **Quick Start Guides**
 
-### **🔒 Security & Zero Trust Architecture (ZTA)**
+### **For Engineering & DevOps**
 
-- **Comprehensive Security Testing**: 41+ security test methods covering command injection, path traversal, and input validation
-- **OWASP Top 10 Compliance**: 5/10 categories covered with proactive security measures
-- **Zero Trust Patterns**: Circuit breakers, graceful degradation, retry with exponential backoff
-- **Input Sanitization**: File type validation, path traversal prevention, dangerous character removal
-- **Resource Protection**: Memory exhaustion prevention, file size limits, concurrent access control
+1. **Setup Guide**: Follow `setup/SETUP.md` for `.venv` vs `Docker` deployment options.
+2. **Containerization**: Use `docker compose run` for a zero-install footprint.
+3. **Usage Examples**: Check `usage/RUNNING_THE_PIPELINE.md`.
+4. **Media Support**: Review `usage/SUPPORTED_MEDIA_TYPES.md`.
 
-### **📊 Compliance & Standards**
+### **For Enterprise Architects & Security Officers**
 
-- **PCI DSS Coverage**: 4/12 requirements for secure data handling
-- **CIS Controls**: 4/18 controls for malware defense and data protection
-- **Enterprise Logging**: Secure logging with sensitive data prevention
-- **Audit Trail**: Comprehensive processing logs and error tracking
-- **Data Governance**: Secure file handling and cleanup procedures
+1. **Compliance Overview**: Review the **[Security & Compliance](./architecture/SECURITY_AND_COMPLIANCE.md)**.
+2. **AI Security**: Check **[OWASP Top 10 for LLMs](./features/OWASP_LLM_TOP_10.md)**.
+3. **Performance**: Review **[Enterprise Scalability](./architecture/ENTERPRISE_SCALABILITY.md)**.
+4. **Testing Evidence**: Review security testing documentation in `../tests/docs/`.
 
-### **🤖 AI & Machine Learning Integration**
-
-- **Whisper Transcription**: State-of-the-art speech-to-text with multiple model sizes
-- **LangChain Framework**: Advanced content generation and summarization
-- **Ollama LLM Integration**: Local LLM processing with privacy protection
-- **OCR Processing**: Tesseract-based text extraction from images
-- **Content Intelligence**: Automated study material generation with structured output
-
-### **🏢 Institutional & Government Readiness**
-
-- **On-Premises Processing**: All AI processing can run locally for data sovereignty
-- **Air-Gapped Deployment**: No external API dependencies for core functionality
-- **Secure Configuration**: Encrypted configuration and environment variable support
-- **Scalable Architecture**: Service-oriented design for enterprise deployment
-- **Multi-Language Support**: Unicode support and international character handling
-
-## 🎯 **Quick Start**
-
-### **New Users**
-
-1. **Start with Setup**: Read `setup/SETUP.md` for installation
-2. **Check Prerequisites**: Review `setup/PREREQUISITES.md` for requirements
-3. **Learn Usage**: Read `usage/USAGE.md` for basic operations
-4. **Explore Features**: Check `features/FEATURES.md` for capabilities
-
-### **Developers**
-
-1. **Understand Architecture**: Review `architecture/ARCHITECTURE.md`
-2. **Processing Pipeline**: Study `architecture/PROCESSING_ARCHITECTURE.md`
-3. **Advanced Features**: Explore `features/ADVANCED_FEATURES.md`
-4. **Engineering Standards**: Read `guides/ENGINEERING_EXCELLENCE.md`
-
-### **System Administrators**
-
-1. **Setup Guide**: Follow `setup/SETUP.md` for `.venv` vs `Docker` deployment options
-2. **Containerization**: Use `docker compose run` for a zero-install footprint
-3. **Migration Guide**: Use `setup/MIGRATION.md` for upgrades
-4. **Usage Examples**: Check `usage/RUNNING_THE_PIPELINE.md`
-5. **Media Support**: Review `usage/SUPPORTED_MEDIA_TYPES.md`
-
-### **Enterprise & Government Users**
-
-1. **Security Documentation**: Review security testing documentation in `tests/docs/`
-2. **Compliance Standards**: Check OWASP, CIS, and PCI DSS compliance
-3. **Deployment Guide**: Choose between secure local installations or containerized deployment
-4. **Architecture Review**: Study system architecture for enterprise deployment
-
-## 🔍 **Finding Information**
-
-### **By Topic**
+## 🔍 **Finding Information by Topic**
 
 - **Installation & Setup**: `setup/` directory
 - **How to Use**: `usage/` directory
-- **System Design**: `architecture/` directory
-- **Capabilities**: `features/` directory
+- **System Design & Compliance**: `architecture/` directory
+- **Capabilities & AI Defenses**: `features/` directory
 - **Best Practices**: `guides/` directory
 - **Project Status**: `reference/` directory
-- **Security & Testing**: `tests/docs/` directory
-
-### **By Role**
-
-- **End Users**: `usage/` + `features/`
-- **Developers**: `architecture/` + `guides/` + `features/`
-- **Administrators**: `setup/` + `usage/`
-- **Enterprise Users**: `setup/` + `architecture/` + `tests/docs/`
-- **Contributors**: `reference/` + `guides/`
+- **Security & Testing**: `../tests/docs/` directory
 
 ## 📖 **Document Navigation**
 

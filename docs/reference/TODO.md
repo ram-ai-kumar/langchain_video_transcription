@@ -114,7 +114,21 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ## **Medium-Term Enhancements**
 
-### **5. Temporary File Cleanup**
+### **5. Enterprise GRC & Security Capabilities**
+
+**Current State**: Comprehensive local security and basic logging, but lacking integrations for enterprise-scale centralized auditing and privacy enforcement.
+
+**Required Actions**:
+
+- **PII Scrubbing / Data Anonymization**: Implement a preprocessing step to scrub Personally Identifiable Information (PII) from transcripts before passing them to the LangChain LLM, fortifying SOC 2 Privacy compliance.
+- **SIEM / Audit Log Export**: Configure structured logging (JSON) to easily export audit trails to SIEM solutions (e.g., Splunk, Datadog) for ISO 27001 continuous monitoring.
+- **RBAC for Planned API**: Ensure the planned REST API (see item 18) implements Role-Based Access Control (RBAC) and OIDC/SAML authentication.
+
+**Impact**: Ensures the platform meets the highest echelons of enterprise compliance and auditability.
+
+---
+
+### **6. Temporary File Cleanup**
 
 **Current State**: Audio extracted from video (`.wav`/`.mp3` temp files) is not guaranteed to be cleaned up when processing fails mid-run
 
@@ -136,7 +150,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **6. LLM Connection Reuse + Retry**
+### **7. LLM Connection Reuse + Retry**
 
 **Current State**: A new `OllamaLLM` instance is created per file; `tenacity` is already in `requirements.txt` but unused
 
@@ -159,7 +173,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **7. Error Handling & Resilience**
+### **8. Error Handling & Resilience**
 
 **Current State**: Basic exception handling with custom types; transient failures abort processing
 
@@ -173,7 +187,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **8. Security & Input Validation**
+### **9. Security & Input Validation**
 
 **Current State**: Basic file existence checks only
 
@@ -188,7 +202,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **9. Code Quality & Developer Experience**
+### **10. Code Quality & Developer Experience**
 
 **Current State**: Good structure but missing tooling; type hints exist but are not enforced
 
@@ -217,7 +231,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ## **Nice-to-Have / Polish**
 
-### **10. OCR Quality Improvement**
+### **11. OCR Quality Improvement**
 
 **Current State**: Raw `pytesseract.image_to_string()` with default config gives poor results on lecture slides with dark backgrounds or small fonts
 
@@ -231,7 +245,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **11. Whisper Model Caching Across Runs**
+### **12. Whisper Model Caching Across Runs**
 
 **Current State**: The Whisper model is loaded once per pipeline invocation but reloaded on every new run, which is slow
 
@@ -245,7 +259,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **12. Study Prompt Versioning**
+### **13. Study Prompt Versioning**
 
 **Current State**: `config/study_prompt.txt` is a flat text file with no version metadata; impossible to tell which prompt version produced which study material
 
@@ -259,7 +273,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **13. Dependency Management with `pip-compile`**
+### **14. Dependency Management with `pip-compile`**
 
 **Current State**: `requirements.txt` lists 54 packages, many of which are transitive dependencies mixed with direct ones
 
@@ -272,7 +286,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **14. Clarify `src/domain/` Naming**
+### **15. Clarify `src/domain/` Naming**
 
 **Current State**: The directory is labeled `domain/` (DDD language) but `src/core/pipeline.py` is doing the actual domain orchestration; `src/domain/` doesn't exist yet
 
@@ -285,7 +299,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **15. Enhanced CLI Features**
+### **16. Enhanced CLI Features**
 
 **Current State**: Comprehensive but some user experience gaps
 
@@ -299,7 +313,7 @@ def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
 
 ---
 
-### **16. Plugin Architecture**
+### **17. Plugin Architecture**
 
 **Proposed Enhancement**: Allow custom processors and generators via a plugin system
 
@@ -317,7 +331,7 @@ class PluginManager:
 
 ---
 
-### **17. REST API Interface**
+### **18. REST API Interface**
 
 **Proposed Enhancement**: Web interface for remote processing
 
@@ -340,7 +354,7 @@ async def get_job_status(job_id: str):
 
 ---
 
-### **18. Database Integration**
+### **19. Database Integration**
 
 **Proposed Enhancement**: Metadata storage and search capabilities
 
@@ -355,7 +369,7 @@ async def get_job_status(job_id: str):
 
 ---
 
-### **19. Advanced PDF Features**
+### **20. Advanced PDF Features**
 
 **Proposed Enhancement**: Enhanced PDF generation with more customization
 
