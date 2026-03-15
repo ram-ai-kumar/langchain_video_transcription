@@ -14,7 +14,7 @@ class StudyMaterialGenerator:
 
     def __init__(self, config: PipelineConfig):
         self.config = config
-        self.llm_processor = LLMProcessor(config)
+        self._llm_processor = None
 
         # Always use basic PDF generator
         if config.generate_pdf:
@@ -39,8 +39,12 @@ class StudyMaterialGenerator:
             else:
                 pdf_file = output_dir / f"{base_name}.pdf"
 
+            # Lazy load LLM processor only when generation is required
+            if self._llm_processor is None:
+                self._llm_processor = LLMProcessor(self.config)
+
             # Generate study material using LLM
-            llm_result = self.llm_processor.process(transcript_path, study_file)
+            llm_result = self._llm_processor.process(transcript_path, study_file)
 
             if not llm_result.success:
                 return ProcessResult(
@@ -114,9 +118,16 @@ class StudyMaterialGenerator:
             "overall_ready": False
         }
 
-        # Check LLM availability
+        # Check LLM availability only if generation is strictly required
         try:
-            validation["llm_available"] = self.llm_processor.validate_llm_connection()
+            # We don't instantiate the heavy LLM processor here to check availability
+            # We just do a lightweight check if the target requires MD generation
+            if self.config.target in ["markdown", "pdf"]:
+                if self._llm_processor is None:
+                    self._llm_processor = LLMProcessor(self.config)
+                validation["llm_available"] = self._llm_processor.validate_llm_connection()
+            else:
+                validation["llm_available"] = True # LLM is skipped
         except Exception:
             validation["llm_available"] = False
 
@@ -145,9 +156,13 @@ class StudyMaterialGenerator:
                 "llm_model": self.config.llm_model,
                 "generate_pdf": self.config.generate_pdf,
                 "prompt_file": str(self.config.prompt_file)
-            },
-            "llm_info": self.llm_processor.get_model_info()
+            }
         }
+        
+        if self._llm_processor:
+            info["llm_info"] = self._llm_processor.get_model_info()
+        else:
+            info["llm_info"] = "Not loaded (lazy)"
 
         if self.pdf_generator:
             info["pdf_info"] = self.pdf_generator.get_dependency_info()

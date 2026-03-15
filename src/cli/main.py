@@ -319,7 +319,8 @@ Examples:
 
         # Start processing
         try:
-            print(ColorFormatter.info("AI is warming up... ready to crunch some knowledge."))
+            if config.target in ["markdown", "pdf"]:
+                print(ColorFormatter.info("AI is warming up... ready to crunch some knowledge."))
 
             # Process directory
             result = self.pipeline.process_directory(args.directory)
