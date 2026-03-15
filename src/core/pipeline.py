@@ -118,7 +118,6 @@ class VideoTranscriptionPipeline:
 
             self.status_reporter.info(f"Starting directory processing: {directory}")
 
-            # Get all file groups
             file_groups = self.file_discovery.group_files_by_stem(directory)
 
             if not file_groups:
@@ -130,30 +129,202 @@ class VideoTranscriptionPipeline:
 
             self.status_reporter.info(f"Found {len(file_groups)} file groups to process")
 
-            # Process in three passes
-            processed_count = 0
-            error_count = 0
+            tree = {}
 
-            # Pass 1: Process video/audio/text groups
-            processed_count += self._process_media_groups(file_groups, directory)
+            # Helper to add task to tree
+            def add_task(file_path, task):
+                try:
+                    rel_path = file_path.relative_to(directory)
+                except ValueError:
+                    rel_path = file_path.name
 
-            # Pass 2: Process image groups
-            processed_count += self._process_image_groups(file_groups, directory)
+                parts = rel_path.parts
 
-            # Pass 3: Process loose images
-            processed_count += self._process_loose_images(directory)
+                current = tree
+                for part in parts[:-1]:
+                    if part not in current:
+                        current[part] = {}
+                    current = current[part]
 
-            message = f"Processed {processed_count} items successfully"
-            if error_count > 0:
-                message += f" with {error_count} errors"
+                task_key = f"__task__{task['name']}"
+                current[task_key] = task
+
+            # 1. Media groups
+            for group_key in sorted(file_groups.keys(), key=lambda k: k.lower()):
+                files = file_groups[group_key]
+                source_path, start_type = self.file_discovery.find_primary_source(files)
+                if source_path and start_type in ["video", "audio", "text"]:
+                    add_task(source_path, {
+                        "type": "media",
+                        "name": source_path.name,
+                        "source_path": source_path,
+                        "start_type": start_type,
+                        "stem": source_path.stem
+                    })
+
+            # 2. Image groups
+            for group_key in sorted(file_groups.keys(), key=lambda k: k.lower()):
+                files = file_groups[group_key]
+                image_files = self.file_discovery.separate_image_files(files)
+                if not image_files:
+                    continue
+
+                stem = group_key.split("::")[-1] if "::" in group_key else group_key
+                target_dir = image_files[0].parent
+                transcript_file = target_dir / f"{stem}.txt"
+
+                add_task(transcript_file, {
+                    "type": "image_group",
+                    "name": transcript_file.name + " (Images)",
+                    "stem": stem,
+                    "image_files": image_files,
+                    "transcript_file": transcript_file
+                })
+
+            # 3. Loose images
+            all_files = self.file_discovery.discover_files(directory)
+            all_image_files = [f for f in all_files if self.config.is_image_file(f)]
+
+            # Pre-calculate processed stems to isolate loose images
+            processed_stems_pre = set()
+            for group_key, files in file_groups.items():
+                source_path, start_type = self.file_discovery.find_primary_source(files)
+                if source_path and start_type in ["video", "audio", "text"]:
+                    processed_stems_pre.add(source_path.stem)
+
+                image_files_sep = self.file_discovery.separate_image_files(files)
+                if image_files_sep:
+                    stem = group_key.split("::")[-1] if "::" in group_key else group_key
+                    processed_stems_pre.add(stem)
+
+            unprocessed_images = [f for f in all_image_files if f.stem not in processed_stems_pre]
+
+            dir_loose_groups = {}
+            for img_path in unprocessed_images:
+                dir_loose_groups.setdefault(img_path.parent, []).append(img_path)
+
+            for dir_path, images in dir_loose_groups.items():
+                folder_name = dir_path.name
+                transcript_file = dir_path / f"{folder_name}.txt"
+                add_task(transcript_file, {
+                    "type": "loose_images",
+                    "name": transcript_file.name + " (Loose Images)",
+                    "folder_name": folder_name,
+                    "images": images,
+                    "transcript_file": transcript_file
+                })
+
+            processed_count = [0]
+            error_count = [0]
+            processed_stems = set()
+
+            print(f"\n📁 {directory.name}/")
+
+            def execute_task(task, prefix_for_progress):
+                try:
+                    if task["type"] == "media":
+                        steps = PROCESSING_STEPS.get(task["start_type"], ["transcript", "study_material", "pdf"])
+                        self.progress_reporter.start_processing(task["name"], steps, prefix_for_progress)
+                        result = self.process_single_source(task["source_path"], task["start_type"])
+                        self.progress_reporter.complete_processing(result.success)
+
+                        if result.success:
+                            processed_count[0] += 1
+                            processed_stems.add(task["stem"])
+                            self.processed_stems.add(task["stem"])
+                        else:
+                            error_count[0] += 1
+                            self.status_reporter.error(f"Failed to process {task['name']}: {result.message}")
+
+                    elif task["type"] == "image_group":
+                        steps = PROCESSING_STEPS.get("image", ["transcript", "study_material", "pdf"])
+                        self.progress_reporter.start_processing(task["name"], steps, prefix_for_progress)
+
+                        if not task["transcript_file"].exists():
+                            sys.stdout.write("\r" + " " * 120 + "\r")
+                            self.status_reporter.info(f"{prefix_for_progress}Processing images: {task['stem']}/ ({len(task['image_files'])} images)")
+                            img_res = self.image_processor.process(task["image_files"], task["transcript_file"])
+                            if not img_res.success:
+                                self.status_reporter.error(f"Failed to process images for {task['stem']}: {img_res.message}")
+                                self.progress_reporter.complete_processing(False)
+                                error_count[0] += 1
+                                return
+                        else:
+                            self.progress_reporter.next_step(skipped=True)
+
+                        result = self.process_single_source(task["transcript_file"], "images")
+                        self.progress_reporter.complete_processing(result.success)
+
+                        if result.success:
+                            processed_count[0] += 1
+                            processed_stems.add(task["stem"])
+                            self.processed_stems.add(task["stem"])
+                        else:
+                            error_count[0] += 1
+                            self.status_reporter.error(f"Failed to process study material for {task['stem']}: {result.message}")
+
+                    elif task["type"] == "loose_images":
+                        steps = PROCESSING_STEPS.get("image", ["transcript", "study_material", "pdf"])
+                        self.progress_reporter.start_processing(task["name"], steps, prefix_for_progress)
+
+                        if not task["transcript_file"].exists():
+                            sys.stdout.write("\r" + " " * 120 + "\r")
+                            self.status_reporter.info(f"{prefix_for_progress}Processing loose images: {task['folder_name']}/ ({len(task['images'])} images)")
+                            img_res = self.image_processor.process(task["images"], task["transcript_file"])
+                            if not img_res.success:
+                                self.status_reporter.error(f"Failed to process loose images for {task['folder_name']}: {img_res.message}")
+                                self.progress_reporter.complete_processing(False)
+                                error_count[0] += 1
+                                return
+                        else:
+                            self.progress_reporter.next_step(skipped=True)
+
+                        result = self.process_single_source(task["transcript_file"], "images")
+                        self.progress_reporter.complete_processing(result.success)
+
+                        if result.success:
+                            processed_count[0] += 1
+                        else:
+                            error_count[0] += 1
+                            self.status_reporter.error(f"Failed to process study material for loose images in {task['folder_name']}: {result.message}")
+                except Exception as e:
+                    self.progress_reporter.complete_processing(False)
+                    self.status_reporter.error(f"Error processing {task['name']}: {e}")
+                    error_count[0] += 1
+
+            def traverse_tree(current_tree, prefix=""):
+                def sort_key(k):
+                    is_task = k.startswith("__task__")
+                    return (1 if is_task else 0, k.lower())
+
+                keys = sorted(current_tree.keys(), key=sort_key)
+
+                for i, key in enumerate(keys):
+                    is_last = (i == len(keys) - 1)
+                    connector = "└── " if is_last else "├── "
+                    child_prefix = prefix + ("    " if is_last else "│   ")
+
+                    node = current_tree[key]
+                    if isinstance(node, dict) and not key.startswith("__task__"):
+                        sys.stdout.write("\r" + " " * 120 + "\r")
+                        print(f"{prefix}{connector}📁 {key}/")
+                        traverse_tree(node, child_prefix)
+                    else:
+                        execute_task(node, prefix + connector)
+
+            traverse_tree(tree, "")
+
+            message = f"Processed {processed_count[0]} items successfully"
+            if error_count[0] > 0:
+                message += f" with {error_count[0]} errors"
 
             return ProcessResult(
-                success=error_count == 0,
+                success=error_count[0] == 0,
                 message=message,
                 metadata={
                     "directory": str(directory),
-                    "groups_processed": processed_count,
-                    "errors": error_count
+                    "groups_processed": processed_count[0],
+                    "errors": error_count[0]
                 }
             )
 

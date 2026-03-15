@@ -19,6 +19,15 @@
    python main.py ./data
    ```
 
+   *The pipeline will scan your folder and produce a visual tree:*
+   ```text
+   📁 data/
+   ├── 📁 mobile_app/
+   │   ├── [############################] ✓ login_flow.mp4
+   │   └── [############################] ⏭ user_testing.mp3 (Skipped)
+   └── [############################] ✓ overview.mp4
+   ```
+
 3. **Interactive Prompt or Explicit Targets**
    - If you run the command above, the CLI will **interact and prompt you** for your desired destination format. You can avoid loading heavy AI models entirely if you just need Transcripts!
    - To bypass the prompt and run automatically, explicitly define your target using the `--target` (`-t`) flag:

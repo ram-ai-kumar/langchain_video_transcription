@@ -24,18 +24,20 @@ class ProgressReporter:
         self.current_step = 0
         self.total_steps = 0
         self.skipped_steps = 0
+        self.current_prefix = ""
         self.steps = []
         self.processing = False
         self.bar_width = 28  # Fixed width inside brackets
         self.logger = logging.getLogger(__name__)
 
-    def start_processing(self, file_path: str, steps: list) -> None:
+    def start_processing(self, file_path: str, steps: list, prefix: str = "") -> None:
         """Start processing a file with given steps."""
         self.current_file = file_path
         self.steps = steps
         self.total_steps = len(steps)
         self.current_step = 0
         self.skipped_steps = 0
+        self.current_prefix = prefix
         self.processing = True
 
         # Show initial progress line
@@ -54,10 +56,10 @@ class ProgressReporter:
         if self.processing:
             # Clear the current line
             sys.stdout.write("\r" + " " * 120 + "\r")
-            
+
             # Determine if the entire file processing was skipped
             is_skipped = success and self.skipped_steps > 0 and self.skipped_steps == self.current_step
-            
+
             # Fill the remaining steps if successful (handles early target exits)
             if success and self.current_step < self.total_steps:
                 self.current_step = self.total_steps
@@ -66,11 +68,11 @@ class ProgressReporter:
 
             if not success:
                 self.logger.error("Processing failed for %s", self.current_file)
-                print(ColorFormatter.error(f"[{progress_bar}] ✗ {self.current_file} (Failed)"))
+                print(ColorFormatter.error(f"{self.current_prefix}[{progress_bar}] ✗ {self.current_file} (Failed)"))
             elif is_skipped:
-                print(ColorFormatter.warning(f"[{progress_bar}] ⏭  {self.current_file} (Skipped)"))
+                print(ColorFormatter.warning(f"{self.current_prefix}[{progress_bar}] ⏭  {self.current_file} (Skipped)"))
             else:
-                print(ColorFormatter.success(f"[{progress_bar}] ✓ {self.current_file}"))
+                print(ColorFormatter.success(f"{self.current_prefix}[{progress_bar}] ✓ {self.current_file}"))
 
             self.processing = False
 
@@ -86,7 +88,7 @@ class ProgressReporter:
         progress_bar = self._get_progress_bar()
 
         # Show on same line; pad with spaces to ensure old text is cleared properly
-        progress_line = f"[{progress_bar}] {self.current_file}"
+        progress_line = f"{self.current_prefix}[{progress_bar}] {self.current_file}"
         sys.stdout.write(f"\r{progress_line:<100}")
         sys.stdout.flush()
 
