@@ -32,34 +32,11 @@ This document describes **planned improvements and architecture evolution** for 
 
 ---
 
-### **2. Async / Parallel File Processing**
+### **~~2. Async / Parallel File Processing~~ (Completed)**
 
-**Current State**: Sequential processing — 10 independent lecture videos block each other
+**Current State**: Multi-threaded processing via `concurrent.futures.ThreadPoolExecutor` has been implemented.
 
-**Required Actions**:
-
-- Use `concurrent.futures.ThreadPoolExecutor` for I/O-bound transcription and LLM calls
-- Expose `max_workers` as a CLI option and config field
-- Add progress tracking that works across concurrent jobs
-
-**Example**:
-
-```python
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-def process_directory_concurrent(self, directory: Path) -> list[ProcessResult]:
-    with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
-        futures = {
-            executor.submit(self.process_single_source, file, media_type): file
-            for file, media_type in files_to_process
-        }
-        results = []
-        for future in as_completed(futures):
-            results.append(future.result())
-    return results
-```
-
-**Impact**: Significant performance improvement for batch processing
+**Impact**: Significant performance improvement for batch processing utilizing dynamic thread pool scaling based on host CPU boundaries.
 
 ---
 

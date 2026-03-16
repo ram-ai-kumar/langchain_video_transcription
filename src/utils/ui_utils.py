@@ -15,104 +15,134 @@ PROCESSING_STEPS = {
 }
 
 
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
+from src.utils.progress_subprocess import ProgressType
+
 class ProgressReporter:
-    """Reports progress with fixed-width progress bar."""
+    """Reports progress cleanly for concurrent execution using Rich."""
 
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
-        self.current_file = ""
-        self.current_step = 0
-        self.total_steps = 0
-        self.skipped_steps = 0
-        self.current_prefix = ""
-        self.steps = []
-        self.processing = False
-        self.bar_width = 28  # Fixed width inside brackets
         self.logger = logging.getLogger(__name__)
+        self._lock = threading.Lock()
+        self.progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            expand=True
+        )
+        self.tasks = {}
+        self.task_progress = {}  # Store detailed progress info
+        self.started = False
 
     def start_processing(self, file_path: str, steps: list, prefix: str = "") -> None:
         """Start processing a file with given steps."""
-        self.current_file = file_path
-        self.steps = steps
-        self.total_steps = len(steps)
-        self.current_step = 0
-        self.skipped_steps = 0
-        self.current_prefix = prefix
-        self.processing = True
+        with self._lock:
+            if not self.started:
+                # Ensure Rich doesn't interfere with subprocess outputs
+                import os
+                os.environ['RICH_FORCE_TERMINAL'] = 'true'
+                os.environ['RICH_USE_COLOR'] = 'true'
 
-        # Show initial progress line
-        self._show_progress()
+                self.progress.start()
+                self.started = True
 
-    def next_step(self, skipped: bool = False) -> None:
-        """Move to next step."""
-        if self.processing and self.current_step < self.total_steps:
-            self.current_step += 1
-            if skipped:
-                self.skipped_steps += 1
-            self._show_progress()
+            task_id = self.progress.add_task(
+                description=f"{prefix}{file_path}",
+                total=len(steps)
+            )
+            self.tasks[file_path] = task_id
 
-    def complete_processing(self, success: bool = True) -> None:
-        """Complete processing."""
-        if self.processing:
-            # Clear the current line
-            sys.stdout.write("\r" + " " * 120 + "\r")
+    def next_step(self, file_path: str, skipped: bool = False) -> None:
+        """Move to next step for a specific file."""
+        with self._lock:
+            if file_path in self.tasks:
+                self.progress.update(self.tasks[file_path], advance=1)
 
-            # Determine if the entire file processing was skipped
-            is_skipped = success and self.skipped_steps > 0 and self.skipped_steps == self.current_step
+    def update_task_progress(self, file_path: str, progress_percentage: float, description: str = "") -> None:
+        """Update task progress with simple percentage and description."""
+        with self._lock:
+            if file_path in self.tasks:
+                task_id = self.tasks[file_path]
 
-            # Fill the remaining steps if successful (handles early target exits)
-            if success and self.current_step < self.total_steps:
-                self.current_step = self.total_steps
+                # Get current step progress
+                current_step = self.progress.tasks[task_id].completed or 0
+                total_steps = self.progress.tasks[task_id].total
 
-            progress_bar = self._get_progress_bar()
+                # Calculate progress within current step
+                step_progress = progress_percentage / 100.0
 
-            if not success:
-                self.logger.error("Processing failed for %s", self.current_file)
-                print(ColorFormatter.error(f"{self.current_prefix}[{progress_bar}] ✗ {self.current_file} (Failed)"))
-            elif is_skipped:
-                print(ColorFormatter.warning(f"{self.current_prefix}[{progress_bar}] ⏭  {self.current_file} (Skipped)"))
-            else:
-                print(ColorFormatter.success(f"{self.current_prefix}[{progress_bar}] ✓ {self.current_file}"))
+                # Overall progress = (completed steps) + (current step progress)
+                overall_progress = current_step + step_progress
 
-            self.processing = False
+                # Update Rich progress bar
+                full_description = f"{file_path}"
+                if description:
+                    full_description += f" ({description})"
 
-    def _show_progress(self) -> None:
-        """Show current progress on same line."""
-        if not self.processing:
-            return
+                self.progress.update(task_id, description=full_description, completed=overall_progress)
 
-        # Clear the entire line first
-        sys.stdout.write("\r" + " " * 120 + "\r")
+    def update_task_progress_legacy(self, file_path: str, progress_info) -> None:
+        """Legacy method for backward compatibility with existing progress info objects."""
+        with self._lock:
+            if file_path in self.tasks:
+                task_id = self.tasks[file_path]
+                self.task_progress[file_path] = progress_info
 
-        # Generate progress bar
-        progress_bar = self._get_progress_bar()
+                # Get current step progress
+                current_step = self.progress.tasks[task_id].completed or 0
 
-        # Show on same line; pad with spaces to ensure old text is cleared properly
-        progress_line = f"{self.current_prefix}[{progress_bar}] {self.current_file}"
-        sys.stdout.write(f"\r{progress_line:<100}")
-        sys.stdout.flush()
+                # Handle different progress types
+                if hasattr(progress_info, 'percentage'):
+                    # Real-time progress object
+                    step_progress = progress_info.percentage / 100.0
+                    overall_progress = current_step + step_progress
+                    description = f"{file_path} ({progress_info.description})"
+                    self.progress.update(task_id, description=description, completed=overall_progress)
+                elif hasattr(progress_info, 'type'):
+                    # Legacy progress info object
+                    if progress_info.type.value == 'percentage':
+                        step_progress = progress_info.value / 100.0
+                        overall_progress = current_step + step_progress
+                        description = f"{file_path} ({progress_info.description})"
+                        self.progress.update(task_id, description=description, completed=overall_progress)
+                    elif progress_info.type.value == 'frame_count':
+                        # For frame-based progress, just update description
+                        description = f"{file_path} ({progress_info.description})"
+                        self.progress.update(task_id, description=description)
+                else:
+                    # Fallback - just update description
+                    description = f"{file_path} (Processing...)"
+                    self.progress.update(task_id, description=description)
 
-    def _get_progress_bar(self) -> str:
-        """Generate fixed-width progress bar."""
-        if self.total_steps == 0:
-            return "-" * self.bar_width
+    def complete_processing(self, success: bool = True, file_path: str = "", prefix: str = "", skipped: bool = False) -> None:
+        """Complete processing for a specific file."""
+        with self._lock:
+            if file_path in self.tasks:
+                task_id = self.tasks[file_path]
+                if not success:
+                    self.progress.update(task_id, description=f"{prefix}[red]✗ {file_path}[/red]", completed=self.progress.tasks[task_id].total)
+                elif skipped:
+                    self.progress.update(task_id, description=f"{prefix}[yellow]⏭  {file_path}[/yellow]", completed=self.progress.tasks[task_id].total)
+                else:
+                    self.progress.update(task_id, description=f"{prefix}[green]✓ {file_path}[/green]", completed=self.progress.tasks[task_id].total)
 
-        # Ensure 100% completion when all steps are done
-        if self.current_step >= self.total_steps:
-            return "#" * self.bar_width
+                # Clean up progress info
+                self.task_progress.pop(file_path, None)
 
-        percentage = (self.current_step / self.total_steps)
-        completed_chars = int(self.bar_width * percentage)
-        remaining_chars = self.bar_width - completed_chars
-
-        return "#" * completed_chars + "-" * remaining_chars
+    def stop(self):
+        """Stop the progress display."""
+        with self._lock:
+            if self.started:
+                self.progress.stop()
+                self.started = False
 
     def get_progress_string(self) -> str:
         """Get current progress as string."""
-        if self.total_steps > 0:
-            return f"Step {self.current_step}/{self.total_steps}"
-        else:
-            return "Processing..."
+        return "Processing..."
 
     def format_pipeline_steps(self, steps: list) -> str:
         """Format pipeline steps for display."""

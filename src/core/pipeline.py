@@ -1,10 +1,13 @@
 """Main pipeline orchestrator for video transcription and study material generation."""
 
+import concurrent.futures
 import logging
+import os
+import signal
 import sys
-from pathlib import Path
-from typing import List, Dict, Optional, Set
+import threading
 import whisper
+import torch
 
 from src.core.config import PipelineConfig
 from src.core.exceptions import VideoTranscriptionError, ProcessingError
@@ -219,9 +222,11 @@ class VideoTranscriptionPipeline:
                     "transcript_file": transcript_file
                 })
 
+            # Thread-safe counters and sets
             processed_count = [0]
             error_count = [0]
             processed_stems = set()
+            lock = threading.Lock()
 
             print(f"\n📁 {directory.name}/")
 
@@ -230,15 +235,17 @@ class VideoTranscriptionPipeline:
                     if task["type"] == "media":
                         steps = PROCESSING_STEPS.get(task["start_type"], ["transcript", "study_material", "pdf"])
                         self.progress_reporter.start_processing(task["name"], steps, prefix_for_progress)
-                        result = self.process_single_source(task["source_path"], task["start_type"])
-                        self.progress_reporter.complete_processing(result.success)
+                        result = self.process_single_source(task["source_path"], task["start_type"], task_name=task["name"])
+                        self.progress_reporter.complete_processing(result.success, task["name"], prefix_for_progress)
 
                         if result.success:
-                            processed_count[0] += 1
-                            processed_stems.add(task["stem"])
-                            self.processed_stems.add(task["stem"])
+                            with lock:
+                                processed_count[0] += 1
+                                processed_stems.add(task["stem"])
+                                self.processed_stems.add(task["stem"])
                         else:
-                            error_count[0] += 1
+                            with lock:
+                                error_count[0] += 1
                             self.status_reporter.error(f"Failed to process {task['name']}: {result.message}")
 
                     elif task["type"] == "image_group":
@@ -246,26 +253,28 @@ class VideoTranscriptionPipeline:
                         self.progress_reporter.start_processing(task["name"], steps, prefix_for_progress)
 
                         if not task["transcript_file"].exists():
-                            sys.stdout.write("\r" + " " * 120 + "\r")
                             self.status_reporter.info(f"{prefix_for_progress}Processing images: {task['stem']}/ ({len(task['image_files'])} images)")
                             img_res = self.image_processor.process(task["image_files"], task["transcript_file"])
                             if not img_res.success:
                                 self.status_reporter.error(f"Failed to process images for {task['stem']}: {img_res.message}")
-                                self.progress_reporter.complete_processing(False)
-                                error_count[0] += 1
+                                self.progress_reporter.complete_processing(False, task["name"], prefix_for_progress)
+                                with lock:
+                                    error_count[0] += 1
                                 return
                         else:
-                            self.progress_reporter.next_step(skipped=True)
+                            self.progress_reporter.next_step(task["name"], skipped=True)
 
-                        result = self.process_single_source(task["transcript_file"], "images")
-                        self.progress_reporter.complete_processing(result.success)
+                        result = self.process_single_source(task["transcript_file"], "images", task_name=task["name"])
+                        self.progress_reporter.complete_processing(result.success, task["name"], prefix_for_progress)
 
                         if result.success:
-                            processed_count[0] += 1
-                            processed_stems.add(task["stem"])
-                            self.processed_stems.add(task["stem"])
+                            with lock:
+                                processed_count[0] += 1
+                                processed_stems.add(task["stem"])
+                                self.processed_stems.add(task["stem"])
                         else:
-                            error_count[0] += 1
+                            with lock:
+                                error_count[0] += 1
                             self.status_reporter.error(f"Failed to process study material for {task['stem']}: {result.message}")
 
                     elif task["type"] == "loose_images":
@@ -273,29 +282,34 @@ class VideoTranscriptionPipeline:
                         self.progress_reporter.start_processing(task["name"], steps, prefix_for_progress)
 
                         if not task["transcript_file"].exists():
-                            sys.stdout.write("\r" + " " * 120 + "\r")
                             self.status_reporter.info(f"{prefix_for_progress}Processing loose images: {task['folder_name']}/ ({len(task['images'])} images)")
                             img_res = self.image_processor.process(task["images"], task["transcript_file"])
                             if not img_res.success:
                                 self.status_reporter.error(f"Failed to process loose images for {task['folder_name']}: {img_res.message}")
-                                self.progress_reporter.complete_processing(False)
-                                error_count[0] += 1
+                                self.progress_reporter.complete_processing(False, task["name"], prefix_for_progress)
+                                with lock:
+                                    error_count[0] += 1
                                 return
                         else:
-                            self.progress_reporter.next_step(skipped=True)
+                            self.progress_reporter.next_step(task["name"], skipped=True)
 
-                        result = self.process_single_source(task["transcript_file"], "images")
-                        self.progress_reporter.complete_processing(result.success)
+                        result = self.process_single_source(task["transcript_file"], "images", task_name=task["name"])
+                        self.progress_reporter.complete_processing(result.success, task["name"], prefix_for_progress)
 
                         if result.success:
-                            processed_count[0] += 1
+                            with lock:
+                                processed_count[0] += 1
                         else:
-                            error_count[0] += 1
+                            with lock:
+                                error_count[0] += 1
                             self.status_reporter.error(f"Failed to process study material for loose images in {task['folder_name']}: {result.message}")
                 except Exception as e:
-                    self.progress_reporter.complete_processing(False)
+                    self.progress_reporter.complete_processing(False, task["name"], prefix_for_progress)
                     self.status_reporter.error(f"Error processing {task['name']}: {e}")
-                    error_count[0] += 1
+                    with lock:
+                        error_count[0] += 1
+
+            tasks_to_run = []
 
             def traverse_tree(current_tree, prefix=""):
                 def sort_key(k):
@@ -315,9 +329,22 @@ class VideoTranscriptionPipeline:
                         print(f"{prefix}{connector}📁 {key}/")
                         traverse_tree(node, child_prefix)
                     else:
-                        execute_task(node, prefix + connector)
+                        tasks_to_run.append((node, prefix + connector))
 
             traverse_tree(tree, "")
+
+            # Execute tasks concurrently
+            max_workers = min(32, (os.cpu_count() or 1) + 4)
+            try:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = [executor.submit(execute_task, task, prefix) for task, prefix in tasks_to_run]
+                    concurrent.futures.wait(futures)
+            except KeyboardInterrupt:
+                self.progress_reporter.stop()
+                print("\n\n[bold red]🛑 Processing interrupted by user (Ctrl+C). Terminating...[/bold red]")
+                os._exit(130)
+            finally:
+                self.progress_reporter.stop()
 
             message = f"Processed {processed_count[0]} items successfully"
             if error_count[0] > 0:
@@ -493,8 +520,9 @@ class VideoTranscriptionPipeline:
 
         return processed_count
 
-    def process_single_source(self, source_path: Path, start_type: str) -> ProcessResult:
+    def process_single_source(self, source_path: Path, start_type: str, task_name: Optional[str] = None) -> ProcessResult:
         """Process a single source file through the complete pipeline."""
+        t_name = task_name or source_path.name
         try:
             # Generate output paths
             paths = self.file_discovery.get_output_paths(source_path, start_type)
@@ -502,14 +530,28 @@ class VideoTranscriptionPipeline:
             # Step 1: Extract audio (if starting from video)
             if start_type == "video":
                 if not paths["audio_file"].exists():
-                    result = self.audio_processor.extract_audio_from_video(source_path, paths["audio_file"])
+                    # Create progress simulation for audio extraction
+                    from src.utils.simple_progress import simulate_extraction_progress
+
+                    progress_simulator = simulate_extraction_progress(
+                        lambda pct, desc: self.progress_reporter.update_task_progress(t_name, pct, desc)
+                    )
+
+                    # Start progress simulation
+                    progress_simulator.start("Extracting audio...")
+
+                    try:
+                        result = self.audio_processor.extract_audio_from_video(source_path, paths["audio_file"])
+                    finally:
+                        # Stop progress simulation
+                        progress_simulator.stop("Audio extraction complete!")
 
                     if not result.success:
                         return result
-                    self.progress_reporter.next_step()
+                    self.progress_reporter.next_step(t_name)
                 else:
                     self.status_reporter.info(f"Audio file already exists: {paths['audio_file'].name}")
-                    self.progress_reporter.next_step(skipped=True)
+                    self.progress_reporter.next_step(t_name, skipped=True)
 
             # EARLY EXIT: target == "audio"
             if self.config.target == "audio":
@@ -526,7 +568,34 @@ class VideoTranscriptionPipeline:
                     # Use audio file for transcription
                     audio_source = paths["audio_file"] if start_type == "video" else source_path
 
-                    result = self.audio_processor.process(audio_source, paths["transcript_file"])
+                    # Create progress simulation for transcription
+                    from src.utils.simple_progress import simulate_transcription_progress
+
+                    # Get audio duration for progress estimation (with fallback)
+                    audio_duration = 300.0  # Default 5 minutes
+                    try:
+                        import librosa
+                        audio_duration = librosa.get_duration(filename=str(audio_source))
+                    except ImportError:
+                        # librosa not available, use default
+                        pass
+                    except Exception:
+                        # Error getting duration, use default
+                        pass
+
+                    progress_simulator = simulate_transcription_progress(
+                        lambda pct, desc: self.progress_reporter.update_task_progress(t_name, pct, desc),
+                        audio_duration
+                    )
+
+                    # Start progress simulation
+                    progress_simulator.start("Transcribing audio...")
+
+                    try:
+                        result = self.audio_processor.process(audio_source, paths["transcript_file"])
+                    finally:
+                        # Stop progress simulation
+                        progress_simulator.stop("Transcription complete!")
 
                     if not result.success:
                         return result
@@ -538,10 +607,10 @@ class VideoTranscriptionPipeline:
                         return result
 
                 # Move to next step
-                self.progress_reporter.next_step()
+                self.progress_reporter.next_step(t_name)
             else:
                 if start_type in ["video", "audio"]:
-                    self.progress_reporter.next_step(skipped=True)
+                    self.progress_reporter.next_step(t_name, skipped=True)
 
             # EARLY EXIT: target == "text"
             if self.config.target == "text":
@@ -560,9 +629,9 @@ class VideoTranscriptionPipeline:
                     return result
 
                 # Move to next step
-                self.progress_reporter.next_step()
+                self.progress_reporter.next_step(t_name)
             else:
-                self.progress_reporter.next_step(skipped=True)
+                self.progress_reporter.next_step(t_name, skipped=True)
 
             # EARLY EXIT: target == "markdown"
             if self.config.target == "markdown":

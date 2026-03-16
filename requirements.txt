@@ -41,6 +41,7 @@ pytesseract==0.3.13
 regex==2025.11.3
 requests==2.32.5
 requests-toolbelt==1.0.0
+rich==13.9.4
 sympy==1.14.0
 tenacity==9.1.2
 tiktoken==0.12.0

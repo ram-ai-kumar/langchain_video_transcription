@@ -28,27 +28,11 @@ class AudioProcessor(BaseProcessor):
         """Load Whisper model if not already loaded."""
         if self.model is None:
             try:
-                # Load Whisper model
-                import torch
-                if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-                    device = "mps"
-                elif torch.cuda.is_available():
-                    device = "cuda"
-                else:
-                    device = "cpu"
-                import warnings
-                import os
-                import logging
-                # Suppress all Whisper warnings and progress output
-                os.environ['PYTHONWARNINGS'] = 'ignore::UserWarning'
-                os.environ['TQDM_DISABLE'] = '1'  # Disable tqdm progress bars
-                logging.getLogger('whisper').setLevel(logging.ERROR)  # Suppress whisper logging
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    self.model = whisper.load_model(
-                        self.config.whisper_model,
-                        device=device
-                    )
+                from src.utils.whisper_utils import load_whisper_model_silent
+                self.model = load_whisper_model_silent(
+                    self.config.whisper_model,
+                    device="auto"
+                )
             except Exception as e:
                 raise ModelLoadError(f"Failed to load Whisper model '{self.config.whisper_model}': {e}")
         return self.model
@@ -62,22 +46,20 @@ class AudioProcessor(BaseProcessor):
             # Load model
             model = self._load_model()
 
-            # Transcribe audio
-            import warnings
-            import os
-            import logging
-            # Suppress all Whisper warnings and progress output
-            os.environ['PYTHONWARNINGS'] = 'ignore::UserWarning'
-            os.environ['TQDM_DISABLE'] = '1'  # Disable tqdm progress bars
-            logging.getLogger('whisper').setLevel(logging.ERROR)  # Suppress whisper logging
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                result = model.transcribe(
-                    str(audio_path),
-                    language=self.config.transcription_language,
-                    verbose=False,  # Disable verbose output from Whisper
-                    fp16=False  # Force FP32 to avoid FP16 warning
-                )
+            # Transcribe audio with progress callback
+            from src.utils.whisper_utils import transcribe_silent
+
+            def progress_callback(progress_info):
+                # This will be called with progress updates
+                # The pipeline will handle displaying this
+                pass
+
+            result = transcribe_silent(
+                model,
+                str(audio_path),
+                language=self.config.transcription_language,
+                progress_callback=progress_callback
+            )
 
             # Write transcript
             with open(transcript_path, "w", encoding="utf-8") as f:
@@ -107,17 +89,26 @@ class AudioProcessor(BaseProcessor):
             self.validate_input(video_path)
             self.ensure_output_dir(audio_path)
 
-            # Use ffmpeg to extract audio
+            # Use ffmpeg to extract audio (simple version without progress parsing)
+            import subprocess
+
             cmd = [
                 "ffmpeg",
                 "-i", str(video_path),
                 "-vn",  # No video
                 "-c:a", "libmp3lame",
                 "-q:a", str(self.config.ffmpeg_audio_quality),
+                "-y",  # Overwrite output without asking
                 str(audio_path)
             ]
 
-            subprocess.run(cmd, check=True, capture_output=True)
+            # Run ffmpeg silently
+            result = subprocess.run(
+                cmd,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
 
             return ProcessResult(
                 success=True,
@@ -128,7 +119,7 @@ class AudioProcessor(BaseProcessor):
 
         except subprocess.CalledProcessError as e:
             raise TranscriptionError(
-                f"Failed to extract audio from {video_path.name}: {e.stderr.decode() if e.stderr else str(e)}",
+                f"Failed to extract audio from {video_path.name}: {str(e)}",
                 file_path=str(video_path),
                 processor="AudioProcessor"
             )

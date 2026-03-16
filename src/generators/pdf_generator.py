@@ -11,20 +11,20 @@ from src.processors.base import ProcessResult
 
 class PDFGenerator:
     """Handles PDF generation using Pandoc and Tectonic."""
-    
+
     def __init__(self, config: PipelineConfig):
         self.config = config
         self.header_path = config.header_file
-    
+
     def generate_pdf(self, markdown_path: Path, pdf_path: Path) -> ProcessResult:
         """Convert markdown file to PDF using Pandoc."""
         try:
             if not markdown_path.exists():
                 raise FileNotFoundError(f"Markdown file not found: {markdown_path}")
-            
+
             # Ensure output directory exists
             pdf_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Generate using Tectonic engine
             try:
                 result = self._generate_with_engine(markdown_path, pdf_path, "tectonic")
@@ -32,28 +32,24 @@ class PDFGenerator:
                     return result
             except PDFGenerationError:
                 pass
-            
+
             # If Tectonic failed, try minimal fallback
             return self._generate_minimal_fallback(markdown_path, pdf_path)
-            
+
         except Exception as e:
             raise PDFGenerationError(
                 f"Failed to generate PDF from {markdown_path.name}: {e}",
                 processor="PDFGenerator"
             )
-    
+
     def _generate_with_engine(self, markdown_path: Path, pdf_path: Path, engine: str) -> ProcessResult:
         """Generate PDF using specific LaTeX engine."""
         try:
+            from src.utils.subprocess_utils import capture_command_output
             cmd = self._build_pandoc_command(markdown_path, pdf_path, engine)
-            
-            result = subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            
+
+            result = capture_command_output(cmd, text=True)
+
             return ProcessResult(
                 success=True,
                 output_path=pdf_path,
@@ -64,14 +60,14 @@ class PDFGenerator:
                     "pdf_file": str(pdf_path)
                 }
             )
-            
+
         except subprocess.CalledProcessError as e:
             error_msg = self._extract_error_message(e)
             raise PDFGenerationError(
                 f"PDF generation failed with {engine}: {error_msg}",
                 processor="PDFGenerator"
             )
-    
+
     def _build_pandoc_command(self, markdown_path: Path, pdf_path: Path, engine: str) -> List[str]:
         """Build Pandoc command for the specified engine."""
         base_cmd = [
@@ -88,12 +84,13 @@ class PDFGenerator:
             "--fail-if-warnings=false",
             "--log=INFO"
         ]
-        
+
         return base_cmd
-    
+
     def _generate_minimal_fallback(self, markdown_path: Path, pdf_path: Path) -> ProcessResult:
         """Try minimal PDF generation without header and fancy options."""
         try:
+            from src.utils.subprocess_utils import run_silent_command
             cmd = [
                 "pandoc",
                 str(markdown_path),
@@ -103,22 +100,22 @@ class PDFGenerator:
                 "--variable", "fontsize=12pt",
                 "--fail-if-warnings=false"
             ]
-            
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
-            
+
+            run_silent_command(cmd)
+
             return ProcessResult(
                 success=True,
                 output_path=pdf_path,
                 message="Generated PDF with minimal configuration",
                 metadata={"fallback_mode": True}
             )
-            
+
         except subprocess.CalledProcessError as e:
             raise PDFGenerationError(
                 f"Minimal PDF generation also failed: {self._extract_error_message(e)}",
                 processor="PDFGenerator"
             )
-    
+
     def _extract_error_message(self, error: subprocess.CalledProcessError) -> str:
         """Extract meaningful error message from subprocess error."""
         if error.stderr:
@@ -127,7 +124,7 @@ class PDFGenerator:
             error_output = error.stdout
         else:
             error_output = str(error)
-        
+
         # Look for specific error patterns
         if "Permission denied" in error_output:
             return "Permission denied - check write permissions"
@@ -140,40 +137,43 @@ class PDFGenerator:
         else:
             # Return last 500 characters of error output
             return error_output[-500:] if len(error_output) > 500 else error_output
-    
+
     def validate_dependencies(self) -> bool:
         """Check if required dependencies are available."""
         try:
+            from src.utils.subprocess_utils import run_silent_command
             # Check if pandoc is available
-            subprocess.run(["pandoc", "--version"], check=True, capture_output=True)
-            
+            run_silent_command(["pandoc", "--version"])
+
             # Check if Tectonic is available
             try:
-                subprocess.run(["tectonic", "--version"], check=True, capture_output=True)
+                run_silent_command(["tectonic", "--version"])
                 return True
             except (subprocess.CalledProcessError, FileNotFoundError):
                 return False
-            
+
         except (subprocess.CalledProcessError, FileNotFoundError):
             return False
-    
+
     def get_dependency_info(self) -> dict:
         """Get information about available dependencies."""
         info = {"pandoc": False, "latex_engines": []}
-        
+
         # Check pandoc
         try:
-            result = subprocess.run(["pandoc", "--version"], check=True, capture_output=True, text=True)
+            from src.utils.subprocess_utils import capture_command_output
+            result = capture_command_output(["pandoc", "--version"], text=True)
             info["pandoc"] = True
             info["pandoc_version"] = result.stdout.split('\n')[0] if result.stdout else "Unknown"
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
-        
+
         # Check Tectonic
         try:
-            subprocess.run(["tectonic", "--version"], check=True, capture_output=True)
+            from src.utils.subprocess_utils import run_silent_command
+            run_silent_command(["tectonic", "--version"])
             info["latex_engines"].append("tectonic")
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
-        
+
         return info

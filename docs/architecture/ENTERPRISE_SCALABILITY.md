@@ -32,8 +32,8 @@ Large Language Models (LLMs) and speech-to-text engines (Whisper) require massiv
 
 To handle the reality of enterprise-scale data, the system utilizes concurrent execution pools.
 
-- **Parallel Worker Pools:** When processing directories of media, the system dispatches files across multiple concurrent threads, fully utilizing available CPU boundaries.
-- **Thread-Safe File I/O:** Output generation and temporary file creation employ strict locking mechanisms, ensuring that parallel streams do not overwrite or corrupt each other's state.
+- **Parallel Worker Pools**: Powered by `concurrent.futures.ThreadPoolExecutor`, the system automatically scales the worker pool size based on the host CPU core count, distributing bulk media across concurrent threads.
+- **Thread-Safe File I/O & UI**: Utilizing strict thread locking (`threading.Lock`), output generation, temporary file creation, and progress logging (stateless terminal UI) do not scramble or corrupt each other's state during parallel bulk operations.
 - **Configurable Throttling:** Concurrency limits are configurable via the application configuration, allowing system administrators to govern CPU and memory saturation based on the deployment tier.
 
 ### 4. Bulkhead & Resiliency Patterns
@@ -43,6 +43,14 @@ Scalability goes hand-in-hand with resilience. As throughput scales, so does the
 - **Micro-Segmentation of Failures (Bulkhead):** If one node or thread encounters a critical error (such as a corrupted media file), that specific process is isolated and terminated securely, while the rest of the concurrent batch continues unhindered.
 - **Idempotent Retry Logic:** Transient failures (such as a local model timing out under heavy load) trigger an exponential backoff retry. Operations are idempotent, meaning retrying an operation will not duplicate data or corrupt state.
 - **Graceful Degradation:** If an advanced AI model fails to load, the system degrades to standard deterministic mechanisms whenever possible rather than generating a fatal exception.
+
+### 5. Hardware Acceleration (Apple Silicon / GPU)
+
+Optimizing model inference time is critical for enterprise throughput. The platform implements dynamic hardware detection to bind computation to the most efficient accelerator available:
+
+- **Apple Silicon (MPS)**: Bypasses the CPU to run PyTorch workloads (like Whisper) natively on Metal Performance Shaders (`mps`) for M-Series (M1/M2/M3/M4) chips.
+- **Nvidia CUDA**: Automatically detected and prioritized for Windows/Linux environments equipped with dedicated GPUs.
+- **Ollama Metal Integration**: Local GenAI seamlessly binds to Apple Silicon GPU hardware without complex configuration, aligning tightly with the ZTA requirement of retaining sensitive processing locally and securely.
 
 ---
 

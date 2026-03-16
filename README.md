@@ -29,7 +29,8 @@ Scale AI workloads efficiently without exponential infrastructure costs.
 - **Dynamic Workload Targeting**: The pipeline implements conditional early extraction capabilities (`--target`), allowing users to stop at intermediary artifacts (Audio, Transcripts, Markdown), bypassing unnecessary compute cycles.
 - **Containerized Agility**: Full Docker deployment guarantees zero footprint on host machines and predictable execution across environments.
 - **Idempotent UI & State Tracking**: The pipeline visually tracks skipped elements (`[⏭ Skipped]`) and dynamically constructs an inverted tree hierarchy to depict your exact folder structures, avoiding redundant heavy extraction.
-- **Concurrent Processing Architecture**: Engineered to handle bulk media processing efficiently utilizing multi-threaded worker pools.
+- **Hardware Acceleration**: Natively supports Apple Silicon (M-series) via PyTorch MPS (Metal Performance Shaders), dynamically forcing heavy AI workloads (like Whisper) onto the GPU for massive speedups.
+- **Concurrent Processing Architecture**: Engineered to handle bulk media processing efficiently utilizing thread-safe, multi-threaded worker pools that scale to your CPU core count.
 
 ---
 

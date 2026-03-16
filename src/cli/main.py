@@ -1,8 +1,12 @@
-"""Command-line interface for the video transcription pipeline."""
+import os
+# Silencing competing UI libraries and subprocesses
+from src.utils.subprocess_utils import setup_global_silence
+setup_global_silence()
 
 import argparse
 import logging
 import signal
+import subprocess
 import sys
 import warnings
 from pathlib import Path
@@ -86,8 +90,8 @@ Examples:
 
         parser.add_argument(
             "--llm-model",
-            default="gemma3",
-            help="LLM model for content generation (default: gemma3)"
+            default="qwen3.5",
+            help="LLM model for content generation (default: qwen3.5)"
         )
 
         # UI options
@@ -95,6 +99,38 @@ Examples:
             "--verbose", "-v",
             action="store_true",
             help="Show detailed progress information"
+        )
+
+        # Performance options
+        parser.add_argument(
+            "--no-optimizations",
+            action="store_true",
+            help="Disable performance optimizations"
+        )
+
+        parser.add_argument(
+            "--max-workers",
+            type=int,
+            help="Maximum number of worker threads (auto-detect if not specified)"
+        )
+
+        parser.add_argument(
+            "--device",
+            choices=["auto", "cpu", "cuda", "mps"],
+            help="Computation device (auto-detect if not specified)"
+        )
+
+        parser.add_argument(
+            "--no-batch",
+            action="store_true",
+            help="Disable batch processing"
+        )
+
+        parser.add_argument(
+            "--batch-size",
+            type=int,
+            default=4,
+            help="Batch size for batch processing (default: 4)"
         )
 
         # Validation options
@@ -143,7 +179,7 @@ Examples:
         target = getattr(args, "target", "pdf")
         if target is None:
             target = "pdf"
-            
+
         if getattr(args, "no_pdf", False) and target == "pdf":
             target = "markdown"
 
@@ -152,8 +188,14 @@ Examples:
             "target": target,
             "generate_pdf": target == "pdf" and not getattr(args, "no_pdf", False),
             "whisper_model": getattr(args, "whisper_model", "medium"),
-            "llm_model": getattr(args, "llm_model", "gemma3"),
+            "llm_model": getattr(args, "llm_model", "qwen3.5"),
             "verbose": getattr(args, "verbose", False),
+            # Performance settings
+            "enable_performance_optimizations": not getattr(args, "no_optimizations", False),
+            "max_workers": getattr(args, "max_workers", None),
+            "device": getattr(args, "device", None),
+            "use_batch_processing": not getattr(args, "no_batch", False),
+            "batch_size": getattr(args, "batch_size", 4),
         })
 
         if args.output_dir:
@@ -205,9 +247,9 @@ Examples:
             all_good = False
 
         # Check Pandoc availability
-        import subprocess
+        from src.utils.subprocess_utils import run_silent_command
         try:
-            subprocess.run(["pandoc", "--version"], check=True, capture_output=True)
+            run_silent_command(["pandoc", "--version"])
             print(ColorFormatter.success("✓ Pandoc available"))
         except (subprocess.CalledProcessError, FileNotFoundError):
             print(ColorFormatter.warning("⚠ Pandoc not available - PDF generation will fail"))
@@ -216,7 +258,7 @@ Examples:
 
         # Check Tectonic
         try:
-            subprocess.run(["tectonic", "--version"], check=True, capture_output=True)
+            run_silent_command(["tectonic", "--version"])
             print(ColorFormatter.success("✓ Tectonic available"))
         except (subprocess.CalledProcessError, FileNotFoundError):
             print(ColorFormatter.warning("⚠ Tectonic not found - PDF generation will fail"))

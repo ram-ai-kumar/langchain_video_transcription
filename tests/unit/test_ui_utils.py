@@ -1,7 +1,7 @@
 """Unit tests for UI utilities."""
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, MagicMock, patch
 import io
 import sys
 
@@ -16,94 +16,79 @@ class TestProgressReporter:
     def test_init(self):
         """Test ProgressReporter initialization."""
         reporter = ProgressReporter(verbose=True)
-
         assert reporter.verbose is True
-        assert reporter.current_file == ""
-        assert reporter.current_step == 0
-        assert reporter.total_steps == 0
-        assert reporter.processing is False
+        assert reporter.started is False
 
     def test_start_processing(self):
         """Test starting processing."""
         reporter = ProgressReporter(verbose=True)
+        reporter.progress = Mock()
         steps = ["audio", "transcript", "study_material"]
 
-        # Capture stdout to check progress display
-        captured_output = io.StringIO()
-        with patch('sys.stdout', captured_output):
-            reporter.start_processing("/test/file.txt", steps)
-
-            assert reporter.current_file == "/test/file.txt"
-            assert reporter.steps == steps
-            assert reporter.total_steps == 3
-            assert reporter.processing is True
-
-    def test_start_processing_with_prefix(self):
-        """Test starting processing with a tree prefix."""
-        reporter = ProgressReporter(verbose=True)
-        steps = ["audio"]
+        reporter.start_processing("/test/file.txt", steps)
         
-        captured_output = io.StringIO()
-        with patch('sys.stdout', captured_output):
-            reporter.start_processing("file.txt", steps, prefix="├── ")
-            
-            assert reporter.current_prefix == "├── "
-            assert reporter.processing is True
+        assert reporter.started is True
+        reporter.progress.start.assert_called_once()
+        reporter.progress.add_task.assert_called_once_with(
+            description="/test/file.txt", 
+            total=len(steps)
+        )
+        assert "/test/file.txt" in reporter.tasks
 
     def test_next_step(self):
         """Test moving to next step."""
         reporter = ProgressReporter(verbose=True)
-        steps = ["audio", "transcript", "study_material"]
-
-        reporter.start_processing("/test/file.txt", steps)
-
-        # Move to first step
-        reporter.next_step()
-        assert reporter.current_step == 1
-
-        # Move to final step with skip true
-        reporter.next_step(skipped=True)
-        assert reporter.current_step == 2
-        assert reporter.skipped_steps == 1
+        reporter.progress = Mock()
+        reporter.tasks["file.txt"] = "task_1"
+        
+        reporter.next_step("file.txt")
+        reporter.progress.update.assert_called_once_with("task_1", advance=1)
 
     def test_complete_processing_success(self):
         """Test successful processing completion."""
         reporter = ProgressReporter(verbose=True)
-        steps = ["audio", "transcript", "study_material"]
+        reporter.progress = MagicMock()
+        reporter.tasks["file.txt"] = "task_1"
 
-        captured_output = io.StringIO()
-        with patch('sys.stdout', captured_output):
-            reporter.start_processing("/test/file.txt", steps)
-            reporter.complete_processing(success=True)
+        reporter.complete_processing(success=True, file_path="file.txt", prefix="├── ")
 
-            assert not reporter.processing
-            assert "✓" in captured_output.getvalue()
+        # Verify it updates description with checkmark and sets to completed
+        call_args = reporter.progress.update.call_args[1]
+        assert "[green]✓ file.txt[/green]" in call_args["description"]
+        assert "├── " in call_args["description"]
 
     def test_complete_processing_skipped(self):
-        """Test processing completion when skipped idempotently."""
+        """Test processing completion when skipped."""
         reporter = ProgressReporter(verbose=True)
-        steps = ["audio"]
-        
-        captured_output = io.StringIO()
-        with patch('sys.stdout', captured_output):
-            reporter.start_processing("file.txt", steps)
-            reporter.next_step(skipped=True)
-            reporter.complete_processing(success=True)
-            
-            assert "⏭" in captured_output.getvalue()
-            assert "(Skipped)" in captured_output.getvalue()
+        reporter.progress = MagicMock()
+        reporter.tasks["file.txt"] = "task_1"
+
+        reporter.complete_processing(success=True, file_path="file.txt", skipped=True)
+
+        call_args = reporter.progress.update.call_args[1]
+        assert "[yellow]⏭  file.txt[/yellow]" in call_args["description"]
 
     def test_complete_processing_failure(self):
         """Test processing completion with failure."""
         reporter = ProgressReporter(verbose=True)
-        steps = ["audio", "transcript", "study_material"]
+        reporter.progress = MagicMock()
+        reporter.tasks["file.txt"] = "task_1"
 
-        captured_output = io.StringIO()
-        with patch('sys.stdout', captured_output):
-            reporter.start_processing("/test/file.txt", steps)
-            reporter.complete_processing(success=False)
+        reporter.complete_processing(success=False, file_path="file.txt")
 
-            assert not reporter.processing
+        call_args = reporter.progress.update.call_args[1]
+        assert "[red]✗ file.txt[/red]" in call_args["description"]
+
+    def test_stop(self):
+        """Test stopping reporter."""
+        reporter = ProgressReporter(verbose=True)
+        reporter.progress = Mock()
+        reporter.started = True
+        
+        reporter.stop()
+        
+        assert reporter.started is False
+        reporter.progress.stop.assert_called_once()
 
 
 class TestStatusReporter:

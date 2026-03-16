@@ -45,7 +45,7 @@ This section contains documentation about the system architecture and design.
 ## 🔍 **Key Concepts**
 
 - **Modular Design**: Separation of concerns across components
-- **Pipeline Architecture**: Sequential processing with error handling
+- **Pipeline Architecture**: Concurrent multi-threaded processing with error handling
 - **Plugin System**: Extensible processor architecture
 - **Configuration Management**: Flexible configuration system
 - **Error Resilience**: Graceful degradation and recovery

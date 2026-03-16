@@ -20,7 +20,7 @@ class TestPipelineConfig:
         config = PipelineConfig()
 
         assert config.whisper_model == "medium"
-        assert config.llm_model == "gemma3"
+        assert config.llm_model == "qwen3.5"
         assert config.generate_pdf is True
         assert config.verbose is False
         assert config.output_dir is None
