@@ -1,162 +1,86 @@
-# Video Transcription System: Internal Documentation Index
+# Documentation
 
-Welcome to the central documentation hub. This directory contains detailed architectural, configuration, and security documentation.
+Central documentation hub for the Video Transcription & Study Material Generator.
 
-If you are evaluating the platform from a high-level business or compliance perspective, please refer to the [**Main README**](../README.md).
+For a high-level business or compliance overview, see the [Main README](../README.md).
 
-## 📚 **Documentation Structure**
+---
 
-### **🏗️ Executive & Architecture** (`architecture/`)
+## Architecture (`architecture/`)
 
-For evaluating system posture, compliance, and design patterns:
+System design, security posture, and compliance reference:
 
-- **[Security & Compliance](./architecture/SECURITY_AND_COMPLIANCE.md)** - GRC, SOC 2 / ISO mappings, audit criteria, and Zero Trust features.
-- **[Enterprise Scalability](./architecture/ENTERPRISE_SCALABILITY.md)** - Scaling logic, Dockerization, concurrency, and model lazy-loading mechanisms.
-- **[Security by Design](./architecture/SECURITY_BY_DESIGN.md)** - Implementation details of Zero Trust Architecture.
-- **[ARCHITECTURE.md](./architecture/ARCHITECTURE.md)** - Comprehensive system architecture overview.
-- **[PROCESSING_ARCHITECTURE.md](./architecture/PROCESSING_ARCHITECTURE.md)** - Detailed processing pipeline architecture.
+| Document | Contents |
+| -------- | -------- |
+| [ARCHITECTURE.md](./architecture/ARCHITECTURE.md) | Layered architecture, component design, patterns, technology stack |
+| [PROCESSING_ARCHITECTURE.md](./architecture/PROCESSING_ARCHITECTURE.md) | Three-pass processing pipeline, sliding window scheduler |
+| [ENTERPRISE_SCALABILITY.md](./architecture/ENTERPRISE_SCALABILITY.md) | Scalability mechanisms, lazy-loading, hardware sizing guidance |
+| [SECURITY.md](./architecture/SECURITY.md) | Zero Trust Architecture, input validation, GRC mappings (SOC2 / ISO27001 / NIST / PCI DSS / CIS / OWASP) |
+| [OWASP_LLM_TOP_10.md](./architecture/OWASP_LLM_TOP_10.md) | AI-specific threat mitigations mapped to OWASP LLM Top 10 |
 
-### **⚡ Features & Security** (`features/`)
+## Features (`features/`)
 
-- **[OWASP Top 10 for LLMs](./features/OWASP_LLM_TOP_10.md)** - Mitigation and defense against AI-specific threat vectors.
-- **[FEATURES.md](./features/FEATURES.md)** - Core features and capabilities
-- **[ADVANCED_FEATURES.md](./features/ADVANCED_FEATURES.md)** - Advanced features and extensions
-- **[CUSTOMIZATION.md](./features/CUSTOMIZATION.md)** - Customization options and configurations
+| Document | Contents |
+| -------- | -------- |
+| [FEATURES.md](./features/FEATURES.md) | Full feature list including Unicode support, error recovery, mixed media intelligence |
 
-### **🛠️ Setup** (`setup/`)
+## Setup (`setup/`)
 
-- **[SETUP.md](./setup/SETUP.md)** - Installation and setup instructions
-- **[PREREQUISITES.md](./setup/PREREQUISITES.md)** - System requirements and dependencies
-- **[MIGRATION.md](./setup/MIGRATION.md)** - Migration guide for existing users
+| Document | Contents |
+| -------- | -------- |
+| [SETUP.md](./setup/SETUP.md) | Installation: virtualenv and Docker options |
+| [PREREQUISITES.md](./setup/PREREQUISITES.md) | System requirements and dependency installation |
+| [MIGRATION.md](./setup/MIGRATION.md) | Upgrade guide for existing deployments |
 
-### **🚀 Usage** (`usage/`)
+## Usage (`usage/`)
 
-- **[USAGE.md](./usage/USAGE.md)** - Basic usage instructions
-- **[RUNNING_THE_PIPELINE.md](./usage/RUNNING_THE_PIPELINE.md)** - Pipeline execution guide
-- **[EXAMPLE_CLI_OUTPUT.md](./usage/EXAMPLE_CLI_OUTPUT.md)** - Command-line interface examples
-- **[SUPPORTED_MEDIA_TYPES.md](./usage/SUPPORTED_MEDIA_TYPES.md)** - Supported file formats and media types
+| Document | Contents |
+| -------- | -------- |
+| [USAGE.md](./usage/USAGE.md) | Supported media types, running the pipeline, CLI options, config file, customization, example output |
 
-### **📖 Guides** (`guides/`)
+## Guides (`guides/`)
 
-- **[TOOLS_AND_TECHNOLOGIES.md](./guides/TOOLS_AND_TECHNOLOGIES.md)** - Technology stack and tools overview
-- **[ENGINEERING_EXCELLENCE.md](./guides/ENGINEERING_EXCELLENCE.md)** - Engineering best practices and standards
+| Document | Contents |
+| -------- | -------- |
+| [PERFORMANCE_OPTIMIZATION.md](./guides/PERFORMANCE_OPTIMIZATION.md) | Sliding window scheduler, device selection (CUDA/MPS/CPU), Whisper model selection, enterprise tuning |
+| [ENGINEERING_EXCELLENCE.md](./guides/ENGINEERING_EXCELLENCE.md) | Code quality standards, testing practices, development workflow |
 
-### **📋 Reference** (`reference/`)
+## Reference (`reference/`)
 
-- **[TODO.md](./reference/TODO.md)** - Project roadmap and task tracking
+| Document | Contents |
+| -------- | -------- |
+| [TODO.md](./reference/TODO.md) | Planned improvements and open tasks |
+| [ROADMAP.md](./reference/ROADMAP.md) | Long-term architecture evolution: SOA and DDD proposals |
 
-## 🎯 **Quick Start Guides**
+---
 
-### **For Engineering & DevOps**
+## Quick Start by Role
 
-1. **Setup Guide**: Follow `setup/SETUP.md` for `.venv` vs `Docker` deployment options.
-2. **Containerization**: Use `docker compose run` for a zero-install footprint.
-3. **Usage Examples**: Check `usage/RUNNING_THE_PIPELINE.md`.
-4. **Media Support**: Review `usage/SUPPORTED_MEDIA_TYPES.md`.
+### Engineering & DevOps
 
-### **For Enterprise Architects & Security Officers**
+1. [PREREQUISITES.md](./setup/PREREQUISITES.md) — install dependencies
+2. [SETUP.md](./setup/SETUP.md) — choose `.venv` or Docker
+3. [USAGE.md](./usage/USAGE.md) — run the pipeline
 
-1. **Compliance Overview**: Review the **[Security & Compliance](./architecture/SECURITY_AND_COMPLIANCE.md)**.
-2. **AI Security**: Check **[OWASP Top 10 for LLMs](./features/OWASP_LLM_TOP_10.md)**.
-3. **Performance**: Review **[Enterprise Scalability](./architecture/ENTERPRISE_SCALABILITY.md)**.
-4. **Testing Evidence**: Review security testing documentation in `../tests/docs/`.
+### Enterprise Architects & Security Officers
 
-## 🔍 **Finding Information by Topic**
+1. [SECURITY.md](./architecture/SECURITY.md) — full GRC and ZTA reference
+2. [OWASP_LLM_TOP_10.md](./architecture/OWASP_LLM_TOP_10.md) — AI threat mitigations
+3. [ENTERPRISE_SCALABILITY.md](./architecture/ENTERPRISE_SCALABILITY.md) — scalability and hardware sizing
+4. Security testing evidence: [`tests/docs/`](../tests/docs/)
 
-- **Installation & Setup**: `setup/` directory
-- **How to Use**: `usage/` directory
-- **System Design & Compliance**: `architecture/` directory
-- **Capabilities & AI Defenses**: `features/` directory
-- **Best Practices**: `guides/` directory
-- **Project Status**: `reference/` directory
-- **Security & Testing**: `../tests/docs/` directory
+### Performance Tuning
 
-## 📖 **Document Navigation**
+- [PERFORMANCE_OPTIMIZATION.md](./guides/PERFORMANCE_OPTIMIZATION.md) — scheduler constants, GPU setup, model selection
 
-### **Cross-References**
+---
 
-Documents contain internal links to related content for easy navigation. Look for:
+## Security Testing Evidence
 
-- `[Related Topic](../path/to/document.md)` - Links to other documents
-- `#section-name` - Internal section links
-- **Bold text** - Important concepts and terms
+Comprehensive security testing documentation is in [`tests/docs/`](../tests/docs/):
 
-### **Search Tips**
+- [SECURITY_TESTING_DOCUMENTATION.md](../tests/docs/SECURITY_TESTING_DOCUMENTATION.md)
+- [SECURITY_COMPLIANCE_SUMMARY.md](../tests/docs/SECURITY_COMPLIANCE_SUMMARY.md)
+- [TESTING_DOCUMENTATION.md](../tests/docs/TESTING_DOCUMENTATION.md)
 
-- Use your editor's search functionality to find specific topics
-- Check the main README.md in each subdirectory for section overviews
-- Look at document titles for quick topic identification
-
-## 🧪 **Testing & Quality Assurance**
-
-### **Security Testing Documentation**
-
-For comprehensive security testing information, see the [**Testing Documentation**](../tests/docs/README.md) in the `tests/docs/` directory:
-
-- **[Security Testing Documentation](../tests/docs/SECURITY_TESTING_DOCUMENTATION.md)** - Comprehensive security testing guide
-- **[Security Compliance Summary](../tests/docs/SECURITY_COMPLIANCE_SUMMARY.md)** - Security standards compliance
-- **[Testing Documentation](../tests/docs/TESTING_DOCUMENTATION.md)** - Complete testing guide
-
-### **Quality Metrics**
-
-- **Green Test Suite**: 48 active passing tests (with known failing edge-case vectors explicitly skipped to maintain pipeline stability)
-- **41+ Security Tests**: Command injection, path traversal, input validation
-- **70+ Attack Vectors**: Comprehensive security scenario testing
-- **OWASP Compliance**: 5/10 categories covered
-- **CIS Controls**: 4/18 controls covered
-- **PCI DSS**: 4/12 requirements covered
-
-## � **Getting Help**
-
-### **Documentation Issues**
-
-- Check the most recent documents in each category
-- Verify you're looking at the right section for your role
-- Cross-reference related documents for complete information
-
-### **Common Questions**
-
-- **Installation**: Start with `setup/SETUP.md`
-- **Usage**: Begin with `usage/USAGE.md`
-- **Problems**: Check `setup/PREREQUISITES.md` first
-- **Advanced Topics**: Look in `features/ADVANCED_FEATURES.md`
-- **Security**: Review `tests/docs/SECURITY_TESTING_DOCUMENTATION.md`
-
-### **Enterprise Support**
-
-- **Security Compliance**: Review security testing documentation
-- **Deployment**: Follow setup and architecture guides
-- **Configuration**: Check setup and customization guides
-- **Testing**: Run comprehensive test suite with security focus
-
-## 📊 **Document Status**
-
-### **Core Documentation** (Essential)
-
-- ✅ **Setup Guide** - Complete installation instructions
-- ✅ **Usage Guide** - Basic and advanced usage
-- ✅ **Architecture** - System design and structure
-- ✅ **Features** - Capabilities and options
-
-### **Security Documentation** (Enterprise-Critical)
-
-- ✅ **Security Testing** - Comprehensive security test suite
-- ✅ **Compliance Standards** - OWASP, CIS, PCI DSS coverage
-- ✅ **Enterprise Features** - Security and ZTA patterns
-- ✅ **Testing Infrastructure** - Automated security testing
-
-### **Supporting Documentation** (Helpful)
-
-- ✅ **Prerequisites** - System requirements
-- ✅ **Migration** - Upgrade and migration guide
-- ✅ **Examples** - Real-world usage examples
-- ✅ **Media Types** - Supported formats
-
-### **Enterprise Deployment**
-
-- Review security testing documentation before deployment
-- Check compliance standards for your industry
-- Follow setup and configuration guides carefully
-- Run comprehensive test suite with security focus
-
-This documentation structure is designed to provide clear, organized access to all information about the video transcription system for users, developers, administrators, and enterprise customers.
+**Test coverage**: 48+ passing tests · 41+ security tests · 70+ attack vectors · OWASP 5/10 · CIS 4/18 · PCI DSS 4/12

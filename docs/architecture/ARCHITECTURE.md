@@ -406,6 +406,21 @@ src/
     └── main.py              # CLI implementation
 ```
 
+## Technology Stack
+
+| Stage                    | Tool / Technology                   | Purpose                              |
+| ------------------------ | ----------------------------------- | ------------------------------------ |
+| Video → Audio            | **ffmpeg**                          | Reliable audio extraction            |
+| Audio → Text             | **Whisper**                         | State-of-the-art transcription       |
+| Images → Text            | **Tesseract OCR**                   | Optical character recognition        |
+| Text → Summary           | **LangChain Core** + **Ollama LLM** | Prompt orchestration & summarization |
+| Summary → Study Material | **LangChain PromptTemplate**        | Rich, structured learning content    |
+| Study Prompt             | **config/study_prompt.txt**         | Externalized customization of output |
+| Markdown → PDF           | **Pandoc** + **Tectonic**           | Professional document generation     |
+| CLI UX                   | **Python sys.stdout + spinner**     | User-friendly progress visualization |
+
+---
+
 ## Deployment & Execution Options
 
 1. **Local Virtual Environment (`.venv`)**: Ideal for developers. Requires manual installation of `ffmpeg`, `Tesseract`, `Pandoc`, and `Tectonic`.

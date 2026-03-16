@@ -28,13 +28,14 @@ Large Language Models (LLMs) and speech-to-text engines (Whisper) require massiv
 - **Graceful Resource Release:** The system automatically cleans up memory pipelines, ensuring that sequential processing doesn't cause Out-Of-Memory (OOM) failures over time.
 - **Business Impact:** This dramatically lowers the hardware requirements to run the software. Enterprises can run the platform on more cost-effective hardware while still acting on large inputs.
 
-### 3. Concurrent Multi-Threaded Processing
+### 3. Sliding Window Scheduler
 
-To handle the reality of enterprise-scale data, the system utilizes concurrent execution pools.
+To handle enterprise-scale directories without resource exhaustion, the system uses a bounded sliding window rather than an unbounded thread pool.
 
-- **Parallel Worker Pools**: Powered by `concurrent.futures.ThreadPoolExecutor`, the system automatically scales the worker pool size based on the host CPU core count, distributing bulk media across concurrent threads.
-- **Thread-Safe File I/O & UI**: Utilizing strict thread locking (`threading.Lock`), output generation, temporary file creation, and progress logging (stateless terminal UI) do not scramble or corrupt each other's state during parallel bulk operations.
-- **Configurable Throttling:** Concurrency limits are configurable via the application configuration, allowing system administrators to govern CPU and memory saturation based on the deployment tier.
+- **Window size: 4** — at most 4 files are loaded (2 running + 2 queued) at any moment. As each file completes, the next unseen file enters the window, keeping memory and I/O pressure constant regardless of directory size.
+- **Concurrency: 2** — at most 2 files execute simultaneously, preventing LLM and Whisper from competing for VRAM under concurrent load.
+- **Thread-Safe State**: Output generation, temporary file creation, and progress reporting are protected by `threading.Lock`, preventing state corruption during parallel operations.
+- **Configurable Constants**: `PIPELINE_WINDOW_SIZE` and `PIPELINE_CONCURRENCY` in `src/core/pipeline.py` can be tuned by administrators for dedicated GPU nodes.
 
 ### 4. Bulkhead & Resiliency Patterns
 
@@ -59,7 +60,7 @@ Optimizing model inference time is critical for enterprise throughput. The platf
 While the platform is efficient, baseline hardware recommendations scale with workload demands:
 
 | Tier | Use Case | Recommended Hardware | Scalability Strategy |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Standard** | Daily departmental use, sequential processing. | 16GB RAM, 8-Core CPU (or M-Series Mac). | Docker `.venv` or single container run. Models loaded sequentially. |
 | **Enterprise Batch** | Large archive ingestion, concurrent operations. | 32GB+ RAM, 16-Core CPU, dedicated GPU (Nvidia/Metal). | Multiple worker threads enabled. GPU acceleration for Whisper/Ollama. |
 | **Distributed / Cloud** | Organization-wide shared service. | Kubernetes Cluster w/ dynamic GPU node pools. | Helm chart deployment. Horizontal Pod Autoscaling based on VRAM/CPU alerts. |

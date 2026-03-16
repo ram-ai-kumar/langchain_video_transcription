@@ -76,7 +76,7 @@ class PDFGenerator:
             "-o", str(pdf_path),
             "--from", "markdown+lists_without_preceding_blankline",
             f"--pdf-engine={engine}",
-            f"--include-in-header={str(self.header_path)}",
+            f"--include-in-header={str(self._sanitize_path(self.header_path))}",
             "--variable", "fontsize=12pt",
             "--toc",
             "--toc-depth=3",
@@ -177,3 +177,17 @@ class PDFGenerator:
             pass
 
         return info
+
+    def _sanitize_path(self, path: Path) -> Path:
+        """Sanitize path for compatibility with external tools like Tectonic.
+        
+        Replaces problematic Unicode characters such as narrow no-break space (\u202f)
+        with standard spaces.
+        """
+        path_str = str(path)
+        # Handle narrow no-break space which tectonic often chokes on in paths
+        sanitized = path_str.replace('\u202f', ' ')
+        
+        if sanitized != path_str:
+            return Path(sanitized)
+        return path

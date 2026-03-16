@@ -1,372 +1,14 @@
-# Next Changes: Upcoming Architecture Evolution
+# Architecture Roadmap
 
-[← Back to README](../README.md)
+[← Back to docs](../README.md)
 
-This document describes **planned improvements** for the Video Transcription & Study Material Generator. Items are ordered from most critical to least significant. Long-term architectural proposals (SOA and DDD) are in [ROADMAP.md](./ROADMAP.md).
-
----
-
-## **Critical Improvements (Immediate Priority)**
-
-### **~~1. Testing Infrastructure~~ (Completed)**
-
-**Current State**: Comprehensive test suite exists — 48+ passing tests covering processors, pipeline scheduler, CLI, configuration, security, and file utilities. Test dependencies (`pytest`, `pytest-cov`, `pytest-mock`) are in `requirements.txt`.
-
-**Remaining gaps**:
-
-- Enforce minimum 60% code coverage in CI
-- Add integration tests for full end-to-end pipeline workflows
-- Add test fixtures for temporary media files to reduce mock complexity
-
-**Impact**: Essential for safe refactoring and catching regressions
+This document describes the long-term architectural evolution path for the platform. It is separated from the [immediate task list](./TODO.md) to keep day-to-day work focused.
 
 ---
 
-### **~~2. Async / Parallel File Processing~~ (Completed)**
+## Architecture Evolution: Service-Oriented Architecture (SOA)
 
-**Current State**: Sliding window scheduler implemented in `src/core/pipeline.py`.
-
-- `PIPELINE_WINDOW_SIZE = 4` — max tasks loaded (queued + running) at once
-- `PIPELINE_CONCURRENCY = 2` — max tasks executing simultaneously
-- As each task completes the next unseen task enters the window, keeping memory pressure bounded on large directories
-
-**Impact**: Bounded memory and I/O pressure for large batches; peak concurrency capped at 2 to avoid LLM/Whisper resource contention.
-
----
-
-### **3. Populate the `src/domain/` Layer**
-
-**Current State**: `src/domain/` does not exist; business logic is scattered across processors and the pipeline
-
-**Required Actions**:
-
-- Create `TranscriptDocument` value object
-- Create `StudyMaterial` aggregate
-- Extract file-grouping and conflict-resolution business rules from `pipeline.py` into domain services
-- Ensure the domain layer has zero infrastructure dependencies
-
-**Impact**: Makes business rules testable in isolation; enables the SOA/DDD evolution described later
-
----
-
-### **4. Configuration Validation with Pydantic**
-
-**Current State**: `PipelineConfig` is a plain `@dataclass` — invalid values (e.g., `whisper_model="huge"`) fail late in the pipeline with cryptic errors
-
-**Required Actions**:
-
-- Migrate `PipelineConfig` to `pydantic.BaseModel`
-- Add field-level validators:
-
-  ```python
-  from pydantic import BaseModel, field_validator
-
-  class PipelineConfig(BaseModel):
-      whisper_model: str = "medium"
-      llm_model: str = "qwen3.5"
-
-      @field_validator("whisper_model")
-      @classmethod
-      def validate_whisper_model(cls, v: str) -> str:
-          valid = {"tiny", "base", "small", "medium", "large", "large-v2", "large-v3"}
-          if v not in valid:
-              raise ValueError(f"Invalid whisper model '{v}'. Choose from: {sorted(valid)}")
-          return v
-  ```
-
-- Add environment variable support for sensitive settings
-- Support YAML/TOML config files alongside JSON
-
-**Impact**: Catches bad inputs at startup with clear error messages instead of mid-pipeline crashes
-
----
-
-## **Medium-Term Enhancements**
-
-### **5. Enterprise GRC & Security Capabilities**
-
-**Current State**: Comprehensive local security and basic logging, but lacking integrations for enterprise-scale centralized auditing and privacy enforcement.
-
-**Required Actions**:
-
-- **PII Scrubbing / Data Anonymization**: Implement a preprocessing step to scrub Personally Identifiable Information (PII) from transcripts before passing them to the LangChain LLM, fortifying SOC 2 Privacy compliance.
-- **SIEM / Audit Log Export**: Configure structured logging (JSON) to easily export audit trails to SIEM solutions (e.g., Splunk, Datadog) for ISO 27001 continuous monitoring.
-- **RBAC for Planned API**: Ensure the planned REST API (see item 18) implements Role-Based Access Control (RBAC) and OIDC/SAML authentication.
-
-**Impact**: Ensures the platform meets the highest echelons of enterprise compliance and auditability.
-
----
-
-### **6. Temporary File Cleanup**
-
-**Current State**: Audio extracted from video (`.wav`/`.mp3` temp files) is not guaranteed to be cleaned up when processing fails mid-run
-
-**Required Actions**:
-
-- Wrap audio extraction in a context manager or `try/finally` block:
-
-  ```python
-  import tempfile
-
-  with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tmp:
-      extract_audio(video_path, tmp.name)
-      transcribe(tmp.name)
-  ```
-
-- Audit all temporary file creation paths and ensure cleanup in failure scenarios
-
-**Impact**: Prevents disk space accumulation from repeated failed runs
-
----
-
-### **7. LLM Connection Reuse + Retry**
-
-**Current State**: A new `OllamaLLM` instance is created per file; `tenacity` is already in `requirements.txt` but unused
-
-**Required Actions**:
-
-- Instantiate `OllamaLLM` once at pipeline startup and pass it through to all processors
-- Add retry with exponential backoff for LLM calls:
-
-  ```python
-  from tenacity import retry, stop_after_attempt, wait_exponential
-
-  @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-  def generate_study_material(self, content: str) -> str:
-      return self.chain.invoke({"content": content})
-  ```
-
-- Add a circuit breaker to stop retrying if Ollama is clearly unavailable
-
-**Impact**: Reduces connection overhead for batch runs; prevents transient LLM failures from aborting the pipeline
-
----
-
-### **8. Error Handling & Resilience**
-
-**Current State**: Basic exception handling with custom types; transient failures abort processing
-
-**Required Actions**:
-
-- Improve error context — include file paths and pipeline stage in all exception messages
-- Add graceful degradation: if PDF generation fails, still save the markdown output
-- Log failures per-file and continue processing remaining files instead of stopping
-
-**Impact**: Prevents one bad file from aborting a long batch run
-
----
-
-### **9. Security & Input Validation**
-
-**Current State**: Basic file existence checks only
-
-**Required Actions**:
-
-- Sanitize file paths to prevent directory traversal attacks
-- Validate file sizes before loading into memory to prevent resource exhaustion
-- Add file type verification beyond extension checking (magic number / MIME sniffing)
-- Implement dependency injection for processors to improve testability and reduce hidden coupling
-
-**Impact**: Prevents security vulnerabilities and resource abuse
-
----
-
-### **10. Code Quality & Developer Experience**
-
-**Current State**: Good structure but missing tooling; type hints exist but are not enforced
-
-**Required Actions**:
-
-- Add `pyproject.toml` to consolidate version, tool configuration, and metadata:
-
-  ```toml
-  [tool.pytest.ini_options]
-  testpaths = ["tests"]
-
-  [tool.mypy]
-  strict = true
-
-  [tool.ruff]
-  line-length = 100
-  ```
-
-- Add pre-commit hooks: `ruff`, `mypy`, `pytest`
-- Add code coverage reporting with minimum thresholds
-- Create contributor development guide
-
-**Impact**: Improved code maintainability and developer onboarding
-
----
-
-## **Nice-to-Have / Polish**
-
-### **11. OCR Quality Improvement**
-
-**Current State**: Raw `pytesseract.image_to_string()` with default config gives poor results on lecture slides with dark backgrounds or small fonts
-
-**Required Actions**:
-
-- Pre-process images before OCR: convert to grayscale, apply adaptive thresholding
-- Pass `--psm 6` (assume uniform block of text) to Tesseract for slide-like images
-- Use `config.ocr_language` consistently — the current code falls back to a hard-coded `"eng"` in places
-
-**Impact**: Meaningfully better text extraction from lecture slide images
-
----
-
-### **12. Whisper Model Caching Across Runs**
-
-**Current State**: The Whisper model is loaded once per pipeline invocation but reloaded on every new run, which is slow
-
-**Required Actions**:
-
-- Document model caching behavior clearly
-- Consider a persistent model server pattern (similar to Ollama) for high-frequency use cases
-- At minimum, detect if the model is already cached locally and log the load time
-
-**Impact**: Reduces startup time for repeated processing sessions
-
----
-
-### **13. Study Prompt Versioning**
-
-**Current State**: `config/study_prompt.txt` is a flat text file with no version metadata; impossible to tell which prompt version produced which study material
-
-**Required Actions**:
-
-- Embed a `PROMPT_VERSION` header comment in the file (e.g., `# version: 1.2`)
-- Stamp the prompt version into the generated study material metadata or footer
-- Keep a short changelog at the top of the prompt file
-
-**Impact**: Reproducibility — enables comparing output quality across prompt versions
-
----
-
-### **14. Dependency Management with `pip-compile`**
-
-**Current State**: `requirements.txt` lists 54 packages, many of which are transitive dependencies mixed with direct ones
-
-**Required Actions**:
-
-- Split into `requirements.in` (direct dependencies only) and generate `requirements.txt` via `pip-compile`
-- Move version, project metadata, and tool config into `pyproject.toml`
-
-**Impact**: Cleaner dependency management; easier to upgrade packages safely
-
----
-
-### **15. Clarify `src/domain/` Naming**
-
-**Current State**: The directory is labeled `domain/` (DDD language) but `src/core/pipeline.py` is doing the actual domain orchestration; `src/domain/` doesn't exist yet
-
-**Required Actions**:
-
-- Either commit to DDD properly (populate with aggregates, entities, value objects — see DDD section below)
-- Or rename to `src/models/` to avoid misleading contributors about architectural intent
-
-**Impact**: Reduces confusion for contributors about where business logic belongs
-
----
-
-### **16. Enhanced CLI Features & Interactive Prompts**
-
-**Current State**: `--target` and interactive fallback prompt are implemented. Users can pass `--target text/markdown/pdf` to stop the pipeline early, or omit it to be prompted interactively.
-
-**Remaining actions**:
-
-- Add dry-run mode (`--dry-run`) for previewing operations without processing.
-- Improve progress bars with ETA estimates for long transcription jobs.
-
-**Impact**: Saves compute time and VRAM when users only need intermediate artifacts.
-
----
-
-### **17. Plugin Architecture**
-
-**Proposed Enhancement**: Allow custom processors and generators via a plugin system
-
-```python
-class PluginManager:
-    def load_plugins(self, plugin_dir: Path):
-        for plugin_file in plugin_dir.glob("*.py"):
-            self.load_plugin(plugin_file)
-
-    def register_processor(self, processor_class: type[BaseProcessor]):
-        self._processors.append(processor_class)
-```
-
-**Use Cases**: Custom media formats, specialized processing pipelines, organization-specific output formats
-
----
-
-### **18. REST API Interface**
-
-**Proposed Enhancement**: Web interface for remote processing
-
-```python
-from fastapi import FastAPI, UploadFile
-
-app = FastAPI()
-
-@app.post("/process")
-async def process_files(files: list[UploadFile]):
-    job_id = await create_processing_job(files)
-    return {"job_id": job_id, "status": "queued"}
-
-@app.get("/status/{job_id}")
-async def get_job_status(job_id: str):
-    return await get_job_progress(job_id)
-```
-
-**Use Cases**: Web interface, integration with LMS platforms, multi-user environments
-
----
-
-### **19. Database Integration**
-
-**Proposed Enhancement**: Metadata storage and search capabilities
-
-**Features**:
-
-- Metadata storage for processed files (timestamps, processing stats)
-- Job queue system for background processing
-- Search capabilities across generated content
-- Processing history and analytics
-
-**Use Cases**: Large-scale deployments, content management systems
-
----
-
-### **20. Advanced PDF Features**
-
-**Proposed Enhancement**: Enhanced PDF generation with more customization
-
-**Features**:
-
-- Custom themes and styling options
-- Interactive elements (bookmarks, internal hyperlinks)
-- Batch PDF generation with a master table of contents
-- PDF optimization for different use cases (print vs. screen)
-
----
-
-## **CI/CD Pipeline**
-
-**Current State**: Manual GitHub Actions CI/CD pipeline exists (`.github/workflows/ci.yml`)
-
-**Required Actions**:
-
-- **Configure triggers** if continuous execution is desired (currently set to manual `workflow_dispatch` only)
-- Evaluate running `pytest` and linters on a specific cadence rather than per-push
-- Enforce minimum 60% code coverage
-
-**Impact**: Automated quality checks and reliable deployment process
-
----
-
-> For long-term architectural evolution (SOA and DDD), see [ROADMAP.md](./ROADMAP.md).
-
-### **Current Architecture Limitations**
+### Current Architecture Limitations
 
 While the current architecture is well-structured, it has some limitations:
 
@@ -376,7 +18,7 @@ While the current architecture is well-structured, it has some limitations:
 4. **Limited Testability**: Hard to mock external dependencies and test business rules in isolation
 5. **No Clear Service Boundaries**: Functionality is grouped by technical concerns rather than business capabilities
 
-### **Proposed SOA Structure**
+### Proposed SOA Structure
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
@@ -405,7 +47,7 @@ While the current architecture is well-structured, it has some limitations:
 └──────────────┘ └──────────────┘ └────────────┘
 ```
 
-### **Key Services**
+### Key Services
 
 **Application Services** (Orchestration Layer):
 
@@ -430,7 +72,7 @@ While the current architecture is well-structured, it has some limitations:
 - **`TesseractService`**: Wraps Tesseract OCR calls
 - **`OllamaService`**: Wraps Ollama LLM API calls
 
-### **Benefits of SOA**
+### Benefits of SOA
 
 1. **Loose Coupling**: Services communicate through well-defined interfaces
 2. **Reusability**: Services can be reused across different applications
@@ -441,11 +83,11 @@ While the current architecture is well-structured, it has some limitations:
 
 ---
 
-## **Architecture Evolution: Domain-Driven Design (DDD)**
+## Architecture Evolution: Domain-Driven Design (DDD)
 
 DDD focuses on **modeling the business domain** using domain concepts, entities, value objects, and aggregates.
 
-### **Domain Model Structure**
+### Domain Model Structure
 
 ```text
 Domain Layer
@@ -477,7 +119,7 @@ Domain Layer
     └── StudyMaterialRepository
 ```
 
-### **Domain Entities**
+### Domain Entities
 
 **`MediaFile`** (Entity):
 
@@ -540,7 +182,7 @@ class StudyMaterial:
         self.created_at: datetime = datetime.now()
 ```
 
-### **Value Objects**
+### Value Objects
 
 **`MediaType`** (Value Object):
 
@@ -580,7 +222,7 @@ class ProcessingStatus:
     SKIPPED = ProcessingStatus("skipped")
 ```
 
-### **Domain Services**
+### Domain Services
 
 **`ConflictResolver`** (Domain Service):
 
@@ -615,7 +257,7 @@ class FileGroupingStrategy:
         return dict(groups)
 ```
 
-### **Repositories**
+### Repositories
 
 **`MediaFileRepository`** (Interface):
 
@@ -654,7 +296,7 @@ class FileSystemMediaFileRepository(MediaFileRepository):
         return media_files
 ```
 
-### **Aggregates**
+### Aggregates
 
 **`MediaProcessingAggregate`** (Aggregate Root):
 
@@ -682,37 +324,37 @@ class MediaProcessingAggregate:
         return self._domain_events.copy()
 ```
 
-### **Migration Strategy**
+### Migration Strategy
 
-#### **Phase 1: Introduce Service Layer**
+#### Phase 1: Introduce Service Layer
 
 1. Create service interfaces for current processors
 2. Extract business logic from processors into services
 3. Keep existing processors as service implementations
 4. Gradually migrate code to use services
 
-#### **Phase 2: Introduce Domain Model**
+#### Phase 2: Introduce Domain Model
 
 1. Create domain entities (`MediaFile`, `Transcript`, `StudyMaterial`)
 2. Extract business rules into domain objects
 3. Create value objects (`MediaType`, `ProcessingStatus`)
 4. Migrate business logic from services to domain objects
 
-#### **Phase 3: Introduce Repositories**
+#### Phase 3: Introduce Repositories
 
 1. Create repository interfaces
 2. Implement file system repositories
 3. Replace direct file access with repository calls
 4. Enable easy swapping of storage backends
 
-#### **Phase 4: Refactor Application Services**
+#### Phase 4: Refactor Application Services
 
 1. Create application services that orchestrate domain services
 2. Move orchestration logic from `pipeline.py` into application services
 3. Use domain events for cross-aggregate communication
 4. Implement proper transaction boundaries
 
-### **Benefits of DDD**
+### Benefits of DDD
 
 1. **Ubiquitous Language**: Code uses domain terms that match business language
 2. **Rich Domain Model**: Business logic is encapsulated in domain objects
@@ -721,7 +363,7 @@ class MediaProcessingAggregate:
 5. **Clarity**: Domain concepts are explicit and well-defined
 6. **Flexibility**: Infrastructure can be swapped without affecting domain logic
 
-### **Combined SOA + DDD Architecture**
+### Combined SOA + DDD Architecture
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐

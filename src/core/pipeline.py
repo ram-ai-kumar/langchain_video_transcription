@@ -1,6 +1,7 @@
 """Main pipeline orchestrator for video transcription and study material generation."""
 
 import concurrent.futures
+import itertools
 import logging
 import os
 import signal
@@ -8,6 +9,10 @@ import sys
 import threading
 import whisper
 import torch
+
+# Sliding window scheduler constants
+PIPELINE_WINDOW_SIZE = 4   # max tasks loaded (running + queued) at any time
+PIPELINE_CONCURRENCY = 2   # max tasks executing simultaneously
 
 from src.core.config import PipelineConfig
 from src.core.exceptions import VideoTranscriptionError, ProcessingError
@@ -333,12 +338,27 @@ class VideoTranscriptionPipeline:
 
             traverse_tree(tree, "")
 
-            # Execute tasks concurrently
-            max_workers = min(32, (os.cpu_count() or 1) + 4)
+            # Execute tasks via sliding window:
+            #   - up to PIPELINE_WINDOW_SIZE tasks loaded (queued + active) at once
+            #   - up to PIPELINE_CONCURRENCY tasks executing simultaneously
+            #   - as each task completes, the next unseen task enters the window
+            task_iter = iter(tasks_to_run)
             try:
-                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    futures = [executor.submit(execute_task, task, prefix) for task, prefix in tasks_to_run]
-                    concurrent.futures.wait(futures)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=PIPELINE_CONCURRENCY) as executor:
+                    window = {
+                        executor.submit(execute_task, t, p): (t, p)
+                        for t, p in itertools.islice(task_iter, PIPELINE_WINDOW_SIZE)
+                    }
+                    while window:
+                        done, _ = concurrent.futures.wait(
+                            window, return_when=concurrent.futures.FIRST_COMPLETED
+                        )
+                        for fut in done:
+                            window.pop(fut)
+                            nxt = next(task_iter, None)
+                            if nxt is not None:
+                                t, p = nxt
+                                window[executor.submit(execute_task, t, p)] = (t, p)
             except KeyboardInterrupt:
                 self.progress_reporter.stop()
                 print("\n\n[bold red]🛑 Processing interrupted by user (Ctrl+C). Terminating...[/bold red]")
@@ -653,9 +673,9 @@ class VideoTranscriptionPipeline:
                         self.status_reporter.error(
                             f"PDF generation failed for {source_path.name}: {pdf_result.message}"
                         )
-                    self.progress_reporter.next_step()
+                    self.progress_reporter.next_step(t_name)
                 else:
-                    self.progress_reporter.next_step(skipped=True)
+                    self.progress_reporter.next_step(t_name, skipped=True)
 
             return ProcessResult(
                 success=True,
