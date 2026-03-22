@@ -1,5 +1,6 @@
 """Study material generator that coordinates generation process."""
 
+import re
 from pathlib import Path
 
 from src.core.config import PipelineConfig
@@ -29,8 +30,8 @@ class StudyMaterialGenerator:
             if output_dir is None:
                 output_dir = transcript_path.parent
 
-            # Generate output paths
-            base_name = transcript_path.stem
+            # Generate output paths — sanitize to guard against \u202f in transcript stem
+            base_name = re.sub(r'\s', ' ', transcript_path.stem)
             study_file = output_dir / f"{base_name}_study.md"
 
             # Check if source was a PDF to avoid overwriting original

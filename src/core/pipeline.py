@@ -4,6 +4,7 @@ import concurrent.futures
 import itertools
 import logging
 import os
+import re
 import signal
 import sys
 import threading
@@ -24,6 +25,7 @@ from src.processors.base import ProcessResult
 from src.utils.file_utils import FileDiscovery, FileManager
 from src.utils.ui_utils import ProgressReporter, StatusReporter, PROCESSING_STEPS
 from src.utils.media_utils import MediaTypeDetector, MediaProcessorFactory
+from src.utils.resource_manager import ResourceManager
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -48,8 +50,8 @@ def setup_logging(verbose: bool = False) -> None:
     # Clear existing handlers to avoid duplicates
     root_logger.handlers.clear()
 
-    # Add console handler
-    console_handler = logging.StreamHandler(sys.stdout)
+    # Add console handler (use stderr to avoid interfering with Rich progress display)
+    console_handler = logging.StreamHandler(sys.stderr)
     console_handler.setLevel(log_level)
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
@@ -88,6 +90,17 @@ class VideoTranscriptionPipeline:
 
         # Media type detection
         self.media_detector = MediaTypeDetector(config)
+
+        # Resource management
+        self.resource_manager = ResourceManager(config.verbose)
+        self.resources = self.resource_manager.get_concurrency_recommendation()
+
+        # Override concurrency settings if auto-detection is enabled (None)
+        self.concurrency = config.max_workers if config.max_workers is not None else self.resources["max_total_tasks"]
+        self.window_size = self.resources["window_size"]
+
+        # Semaphore to limit "heavy" tasks (transcription and LLM)
+        self.heavy_task_semaphore = threading.Semaphore(self.resources["max_heavy_tasks"])
 
         # Track processed items
         self.processed_stems: Set[str] = set()
@@ -167,12 +180,14 @@ class VideoTranscriptionPipeline:
                 files = file_groups[group_key]
                 source_path, start_type = self.file_discovery.find_primary_source(files)
                 if source_path and start_type in ["video", "audio", "text"]:
+                    # Sanitize stem for consistent tracking
+                    stem = re.sub(r'\s', ' ', source_path.stem)
                     add_task(source_path, {
                         "type": "media",
                         "name": source_path.name,
                         "source_path": source_path,
                         "start_type": start_type,
-                        "stem": source_path.stem
+                        "stem": stem
                     })
 
             # 2. Image groups
@@ -198,19 +213,26 @@ class VideoTranscriptionPipeline:
             all_files = self.file_discovery.discover_files(directory)
             all_image_files = [f for f in all_files if self.config.is_image_file(f)]
 
-            # Pre-calculate processed stems to isolate loose images
+            # Pre-calculate processed stems to isolate loose images.
+            # Always store the SANITIZED stem so that image files whose filenames
+            # contain Unicode whitespace (e.g. \u202f from macOS screenshots) are
+            # correctly recognised as already-covered and not re-queued as loose images.
             processed_stems_pre = set()
             for group_key, files in file_groups.items():
                 source_path, start_type = self.file_discovery.find_primary_source(files)
                 if source_path and start_type in ["video", "audio", "text"]:
-                    processed_stems_pre.add(source_path.stem)
+                    processed_stems_pre.add(re.sub(r'\s', ' ', source_path.stem))
 
                 image_files_sep = self.file_discovery.separate_image_files(files)
                 if image_files_sep:
                     stem = group_key.split("::")[-1] if "::" in group_key else group_key
-                    processed_stems_pre.add(stem)
+                    processed_stems_pre.add(stem)  # already sanitized via group_key
 
-            unprocessed_images = [f for f in all_image_files if f.stem not in processed_stems_pre]
+            # Compare using sanitized stems so \u202f filenames match their group entry
+            unprocessed_images = [
+                f for f in all_image_files
+                if re.sub(r'\s', ' ', f.stem) not in processed_stems_pre
+            ]
 
             dir_loose_groups = {}
             for img_path in unprocessed_images:
@@ -240,7 +262,15 @@ class VideoTranscriptionPipeline:
                     if task["type"] == "media":
                         steps = PROCESSING_STEPS.get(task["start_type"], ["transcript", "study_material", "pdf"])
                         self.progress_reporter.start_processing(task["name"], steps, prefix_for_progress)
-                        result = self.process_single_source(task["source_path"], task["start_type"], task_name=task["name"])
+
+                        # Use semaphore for heavy tasks (video/audio transcription)
+                        is_heavy = task["start_type"] in ["video", "audio"]
+                        if is_heavy:
+                            with self.heavy_task_semaphore:
+                                result = self.process_single_source(task["source_path"], task["start_type"], task_name=task["name"])
+                        else:
+                            result = self.process_single_source(task["source_path"], task["start_type"], task_name=task["name"])
+
                         self.progress_reporter.complete_processing(result.success, task["name"], prefix_for_progress)
 
                         if result.success:
@@ -269,7 +299,9 @@ class VideoTranscriptionPipeline:
                         else:
                             self.progress_reporter.next_step(task["name"], skipped=True)
 
-                        result = self.process_single_source(task["transcript_file"], "images", task_name=task["name"])
+                        # LLM processing is a heavy task
+                        with self.heavy_task_semaphore:
+                            result = self.process_single_source(task["transcript_file"], "images", task_name=task["name"])
                         self.progress_reporter.complete_processing(result.success, task["name"], prefix_for_progress)
 
                         if result.success:
@@ -298,7 +330,9 @@ class VideoTranscriptionPipeline:
                         else:
                             self.progress_reporter.next_step(task["name"], skipped=True)
 
-                        result = self.process_single_source(task["transcript_file"], "images", task_name=task["name"])
+                        # LLM processing is a heavy task
+                        with self.heavy_task_semaphore:
+                            result = self.process_single_source(task["transcript_file"], "images", task_name=task["name"])
                         self.progress_reporter.complete_processing(result.success, task["name"], prefix_for_progress)
 
                         if result.success:
@@ -344,10 +378,10 @@ class VideoTranscriptionPipeline:
             #   - as each task completes, the next unseen task enters the window
             task_iter = iter(tasks_to_run)
             try:
-                with concurrent.futures.ThreadPoolExecutor(max_workers=PIPELINE_CONCURRENCY) as executor:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=self.concurrency) as executor:
                     window = {
                         executor.submit(execute_task, t, p): (t, p)
-                        for t, p in itertools.islice(task_iter, PIPELINE_WINDOW_SIZE)
+                        for t, p in itertools.islice(task_iter, self.window_size)
                     }
                     while window:
                         done, _ = concurrent.futures.wait(
@@ -540,12 +574,49 @@ class VideoTranscriptionPipeline:
 
         return processed_count
 
+    def _migrate_legacy_unsanitized_files(self, source_path: Path, paths: dict) -> None:
+        """Rename legacy output files that have \u202f (or other Unicode whitespace) in their
+        stems to the corresponding sanitized (regular-space) versions.
+
+        This handles directories that were processed by an older version of the pipeline
+        that wrote output filenames verbatim from the source stem.  Without this step the
+        existence-checks further down would see a missing sanitized file, regenerate it,
+        and leave *two* copies (old unsanitized + new sanitized) on disk.
+        """
+        original_stem = source_path.stem
+        sanitized_stem = re.sub(r'\s', ' ', original_stem)
+        if original_stem == sanitized_stem:
+            return  # nothing to migrate
+
+        dir_path = source_path.parent
+        legacy_map = {
+            "audio_file":      dir_path / f"{original_stem}.mp3",
+            "transcript_file": dir_path / f"{original_stem}.txt",
+            "study_file":      dir_path / f"{original_stem}_study.md",
+            "pdf_file":        dir_path / f"{original_stem}.pdf",
+        }
+
+        for key, legacy_path in legacy_map.items():
+            sanitized_path = paths.get(key)
+            if (
+                sanitized_path
+                and legacy_path != sanitized_path
+                and legacy_path.exists()
+                and not sanitized_path.exists()
+            ):
+                legacy_path.rename(sanitized_path)
+                self.logger.info("Renamed legacy file: %s -> %s", legacy_path.name, sanitized_path.name)
+
     def process_single_source(self, source_path: Path, start_type: str, task_name: Optional[str] = None) -> ProcessResult:
         """Process a single source file through the complete pipeline."""
         t_name = task_name or source_path.name
         try:
             # Generate output paths
             paths = self.file_discovery.get_output_paths(source_path, start_type)
+
+            # Rename any legacy files that have Unicode whitespace in their stems so that
+            # the existence-checks below see them correctly and skip regeneration.
+            self._migrate_legacy_unsanitized_files(source_path, paths)
 
             # Step 1: Extract audio (if starting from video)
             if start_type == "video":
@@ -629,8 +700,8 @@ class VideoTranscriptionPipeline:
                 # Move to next step
                 self.progress_reporter.next_step(t_name)
             else:
-                if start_type in ["video", "audio"]:
-                    self.progress_reporter.next_step(t_name, skipped=True)
+                # If transcript exists, we skip the transcription step in the UI
+                self.progress_reporter.next_step(t_name, skipped=True)
 
             # EARLY EXIT: target == "text"
             if self.config.target == "text":

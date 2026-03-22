@@ -1,6 +1,7 @@
 """File utility functions for the video transcription pipeline."""
 
 import os
+import re
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 from collections import defaultdict
@@ -51,7 +52,10 @@ class FileDiscovery:
             for file in files:
                 file_path = current_dir / file
                 if self._is_supported_file(file_path):
-                    dir_groups[file_path.stem].append(file_path)
+                    # Sanitize stem for grouping to unify original and sanitized filenames
+                    # Handle all space-like Unicode characters (e.g. \u202f)
+                    sanitized_stem = re.sub(r'\s', ' ', file_path.stem)
+                    dir_groups[sanitized_stem].append(file_path)
 
             # Add to overall groups with directory context
             for stem, file_list in dir_groups.items():
@@ -107,7 +111,9 @@ class FileDiscovery:
 
     def get_output_paths(self, source_path: Path, start_type: str) -> Dict[str, Path]:
         """Generate standard output paths for processing."""
-        base = source_path.stem
+        # Sanitize stem for external tool compatibility (e.g. Tectonic)
+        # Handle all space-like Unicode characters (e.g. \u202f)
+        base = re.sub(r'\s', ' ', source_path.stem)
         dir_path = source_path.parent
 
         paths = {

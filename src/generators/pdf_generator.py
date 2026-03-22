@@ -1,5 +1,6 @@
 """PDF generator for converting markdown to PDF using Pandoc and Tectonic."""
 
+import re
 import subprocess
 from pathlib import Path
 from typing import List, Optional
@@ -72,8 +73,8 @@ class PDFGenerator:
         """Build Pandoc command for the specified engine."""
         base_cmd = [
             "pandoc",
-            str(markdown_path),
-            "-o", str(pdf_path),
+            str(self._sanitize_path(markdown_path)),
+            "-o", str(self._sanitize_path(pdf_path)),
             "--from", "markdown+lists_without_preceding_blankline",
             f"--pdf-engine={engine}",
             f"--include-in-header={str(self._sanitize_path(self.header_path))}",
@@ -93,8 +94,8 @@ class PDFGenerator:
             from src.utils.subprocess_utils import run_silent_command
             cmd = [
                 "pandoc",
-                str(markdown_path),
-                "-o", str(pdf_path),
+                str(self._sanitize_path(markdown_path)),
+                "-o", str(self._sanitize_path(pdf_path)),
                 "--from", "markdown+lists_without_preceding_blankline",
                 "--pdf-engine=tectonic",
                 "--variable", "fontsize=12pt",
@@ -181,12 +182,12 @@ class PDFGenerator:
     def _sanitize_path(self, path: Path) -> Path:
         """Sanitize path for compatibility with external tools like Tectonic.
         
-        Replaces problematic Unicode characters such as narrow no-break space (\u202f)
+        Replaces all space-like Unicode characters (e.g. \u202f, \u00a0)
         with standard spaces.
         """
         path_str = str(path)
-        # Handle narrow no-break space which tectonic often chokes on in paths
-        sanitized = path_str.replace('\u202f', ' ')
+        # Handle all space-like Unicode characters which tectonic often chokes on in paths
+        sanitized = re.sub(r'\s', ' ', path_str)
         
         if sanitized != path_str:
             return Path(sanitized)
