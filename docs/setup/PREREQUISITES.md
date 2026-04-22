@@ -12,6 +12,6 @@
 - **Pandoc + Tectonic** (only if you want PDFs)
   - macOS: `brew install pandoc tectonic`
   - Ubuntu/Debian: `sudo apt-get install pandoc` and install Tectonic from [tectonic-typesetting.github.io](https://tectonic-typesetting.github.io/)
-- **Ollama** with an LLM model (defaults to `qwen3.5`)
+- **Ollama** with an LLM model (defaults to `qwen3.5:latest`)
   - Install Ollama from their website
-  - Pull a model, for example: `ollama pull qwen3.5`
+  - Pull a model, for example: `ollama pull qwen3.5:latest`

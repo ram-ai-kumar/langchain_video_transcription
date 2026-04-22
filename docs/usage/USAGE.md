@@ -8,19 +8,19 @@
 
 ### Input
 
-| Type   | Extensions                                        |
-| ------ | ------------------------------------------------- |
-| Video  | `.mp4`, `.mkv`, `.avi`, `.mov`                    |
-| Audio  | `.mp3`, `.wav`, `.m4a`, `.aac`                    |
-| Text   | `.txt`                                            |
+| Type   | Extensions                                                        |
+| ------ | ----------------------------------------------------------------- |
+| Video  | `.mp4`, `.mkv`, `.avi`, `.mov`                                    |
+| Audio  | `.mp3`, `.wav`, `.m4a`, `.aac`                                    |
+| Text   | `.txt`                                                            |
 | Images | `.png`, `.jpg`, `.jpeg`, `.gif`, `.bmp`, `.tiff`, `.tif`, `.webp` |
 
 ### Output
 
-| Format         | Extension | Description                                         |
-| -------------- | --------- | --------------------------------------------------- |
-| Transcript     | `.txt`    | Extracted text from audio/video/images              |
-| Study Material | `.md`     | Structured study guide with glossary and questions  |
+| Format         | Extension | Description                                          |
+| -------------- | --------- | ---------------------------------------------------- |
+| Transcript     | `.txt`    | Extracted text from audio/video/images               |
+| Study Material | `.md`     | Structured study guide with glossary and questions   |
 | PDF            | `.pdf`    | Formatted document (output only — not an input type) |
 
 ---
@@ -62,12 +62,55 @@
    python main.py ./data --target markdown
    ```
 
-4. **Inspect outputs** — for each logical item:
+---
+
+## Progress Display
+
+The pipeline provides real-time progress tracking for each file being processed. Progress is displayed in-place on the same line and updates as processing advances through stages.
+
+### Display Format
+
+```bash
+.../path/to/file.ext stage1 > stage2 > ... > stageN
+```
+
+- **Path Truncation**: Long paths are truncated to show only the last 3 directory levels
+  - Short paths (≤3 levels): Full path shown
+  - Long paths (4+ levels): `.../grandparent/parent/file.ext`
+- **Past Stages**: Completed stages shown by name
+- **Current Stage**: Actively processing stage shown as `...`
+- **Future Stages**: Not displayed (cleaner, focused view)
+
+### Processing Stages by File Type
+
+| File Type | Processing Stages               |
+| --------- | ------------------------------- |
+| Video     | `audio > text > markdown > pdf` |
+| Audio     | `text > markdown > pdf`         |
+| Text      | `markdown > pdf`                |
+| Images    | `text > markdown > pdf`         |
+
+### Example Progress Flow
+
+```bash
+# During text-to-markdown generation:
+.../UCDE05 - Cloud Development/004 Security Solution/003 On Premise and Hosted Solution 1.txt text > ...
+
+# When markdown is ready and PDF generation starts:
+.../UCDE05 - Cloud Development/004 Security Solution/003 On Premise and Hosted Solution 1.txt text > markdown > ...
+
+# When processing is complete:
+✓ .../UCDE05 - Cloud Development/004 Security Solution/003 On Premise and Hosted Solution 1.txt text > markdown > pdf
+```
+
+The progress display updates in-place, providing clean, real-time feedback without cluttering the terminal output.
+
+1. **Inspect outputs** — for each logical item:
    - Transcript: `<name>.txt` (image OCR is cleanly appended to existing transcripts)
    - Study guide (Markdown): `<name>_study.md`
    - PDF (if enabled and Pandoc/Tectonic are installed): `<name>.pdf`
 
-5. **Re-running is safe** — the pipeline is **idempotent**: existing artifacts are reused and only missing pieces are generated. Skipped files are reported as `[⏭ Skipped]`.
+2. **Re-running is safe** — the pipeline is **idempotent**: existing artifacts are reused and only missing pieces are generated. Skipped files are reported as `[⏭ Skipped]`.
 
 ---
 
@@ -107,7 +150,6 @@ python main.py /path/to/media/folder --no-spinner
 
 # Performance overrides
 python main.py /path/to/media/folder --device cuda --whisper-model large
-python main.py /path/to/media/folder --batch-size 2 --max-workers 4
 ```
 
 ---
@@ -119,14 +161,11 @@ Create a JSON configuration file for complex or repeatable setups:
 ```json
 {
   "whisper_model": "large",
-  "llm_model": "qwen3.5",
+  "llm_model": "qwen3.5:latest",
   "generate_pdf": true,
   "verbose": true,
-  "show_spinner": true,
   "output_dir": "/custom/output",
-  "device": "auto",
-  "use_batch_processing": true,
-  "batch_size": 4
+  "device": "auto"
 }
 ```
 

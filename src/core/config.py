@@ -12,7 +12,7 @@ class PipelineConfig:
     """Configuration object for pipeline settings."""
 
     # Model settings
-    llm_model: str = "qwen3.5"
+    llm_model: str = "qwen3.5:latest"
     whisper_model: str = "medium"
 
     # Output settings
@@ -34,11 +34,7 @@ class PipelineConfig:
     transcription_language: str = "en"
 
     # Performance settings
-    enable_performance_optimizations: bool = True
-    max_workers: Optional[int] = None  # Auto-detect if None
     device: Optional[str] = None  # Auto-detect if None (auto, cpu, cuda, mps)
-    use_batch_processing: bool = True
-    batch_size: int = 4
 
     # UI settings
     verbose: bool = False

@@ -10,35 +10,24 @@ This guide covers how the pipeline is engineered to run efficiently across hardw
 
 The pipeline is designed around three principles that directly serve a CXO-level agenda:
 
-| Principle | Implementation | Business Outcome |
-| --------- | -------------- | ---------------- |
-| **Resource governance** | Sliding window scheduler (window=4, concurrency=2) | Predictable compute consumption; no runaway parallelism on shared infrastructure |
-| **Hardware adaptability** | Automatic device detection (CPU / CUDA / MPS) | Runs optimally on existing hardware without re-configuration; no forced cloud spend |
-| **Throughput vs. accuracy trade-off** | Configurable Whisper model size | Teams choose fidelity appropriate to their SLA, not a one-size-fits-all default |
+| Principle                             | Implementation                                      | Business Outcome                                                                    |
+| ------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **Sequential reliability**            | One-by-one file processing with deterministic order | Predictable resource usage; no race conditions or resource contention               |
+| **Hardware adaptability**             | Automatic device detection (CPU / CUDA / MPS)       | Runs optimally on existing hardware without re-configuration; no forced cloud spend |
+| **Throughput vs. accuracy trade-off** | Configurable Whisper model size                     | Teams choose fidelity appropriate to their SLA, not a one-size-fits-all default     |
 
 ---
 
-## Scheduler: Sliding Window
+## Sequential Processing
 
-All file tasks are dispatched through a **sliding window** that keeps resource pressure bounded regardless of directory size:
+The pipeline now uses **simple sequential processing** for maximum reliability and predictable resource usage:
 
-- **Window size: 4** — at most 4 files are loaded (2 running + 2 queued) at any moment
-- **Concurrency: 2** — at most 2 files process simultaneously
+- **Deterministic order**: Files processed alphabetically for reproducible behavior
+- **Bounded resources**: Constant memory and CPU usage regardless of directory size
+- **Error isolation**: Individual file failures don't affect other tasks
+- **Clean shutdown**: Ctrl+C handling with proper cleanup
 
-As each file completes, the next enters the window. On a directory of 200 lecture recordings, the pipeline behaves identically to a directory of 5 — it never attempts to ingest the full list at once.
-
-```text
-Window: [F1, F2, F3, F4]   →  F1 done  →  Window: [F2, F3, F4, F5]
-Running: F1, F2                             Running: F2, F3
-Queued:  F3, F4                             Queued:  F4, F5
-```
-
-The scheduler constants live in `src/core/pipeline.py`:
-
-```python
-PIPELINE_WINDOW_SIZE = 4   # max tasks loaded at once
-PIPELINE_CONCURRENCY = 2   # max tasks executing simultaneously
-```
+This approach eliminates the complexity of concurrent execution while maintaining excellent throughput for typical use cases.
 
 ---
 
@@ -84,13 +73,13 @@ python main.py /path/to/media --device cpu
 
 Whisper model choice is the primary accuracy-vs-speed lever. The pipeline defaults to `medium` — a calibrated balance for lecture-style content.
 
-| Model  | Size    | RAM     | Recommended for                                    |
-| ------ | ------- | ------- | -------------------------------------------------- |
-| tiny   | 39 MB   | ~100 MB | Quick drafts, high-volume batch                    |
-| base   | 74 MB   | ~200 MB | Internal tooling, non-critical transcripts         |
-| small  | 244 MB  | ~500 MB | General-purpose, cost-sensitive deployments        |
+| Model  | Size    | RAM     | Recommended for                                     |
+| ------ | ------- | ------- | --------------------------------------------------- |
+| tiny   | 39 MB   | ~100 MB | Quick drafts, high-volume batch                     |
+| base   | 74 MB   | ~200 MB | Internal tooling, non-critical transcripts          |
+| small  | 244 MB  | ~500 MB | General-purpose, cost-sensitive deployments         |
 | medium | 769 MB  | ~1.5 GB | **Default** — lecture content, technical vocabulary |
-| large  | 1.55 GB | ~3 GB   | Compliance recordings, legal or medical content    |
+| large  | 1.55 GB | ~3 GB   | Compliance recordings, legal or medical content     |
 
 ```bash
 python main.py /path/to/media --whisper-model large
@@ -102,15 +91,15 @@ python main.py /path/to/media --whisper-model large
 
 ### CLI Flags
 
-| Flag | Description | Default |
-| ---- | ----------- | ------- |
-| `--device` | Compute device (`auto`, `cpu`, `cuda`, `mps`) | `auto` |
-| `--whisper-model` | Whisper model size | `medium` |
-| `--batch-size` | Tasks per processing batch | `4` |
-| `--max-workers` | Worker thread ceiling | auto-detect |
-| `--no-optimizations` | Disable all performance optimizations | off |
-| `--no-batch` | Disable batch processing | off |
-| `--verbose` | Emit detailed performance and progress logs | off |
+| Flag                 | Description                                   | Default     |
+| -------------------- | --------------------------------------------- | ----------- |
+| `--device`           | Compute device (`auto`, `cpu`, `cuda`, `mps`) | `auto`      |
+| `--whisper-model`    | Whisper model size                            | `medium`    |
+| `--batch-size`       | Tasks per processing batch                    | `4`         |
+| `--max-workers`      | Worker thread ceiling                         | auto-detect |
+| `--no-optimizations` | Disable all performance optimizations         | off         |
+| `--no-batch`         | Disable batch processing                      | off         |
+| `--verbose`          | Emit detailed performance and progress logs   | off         |
 
 ### Config File (`config.json`)
 

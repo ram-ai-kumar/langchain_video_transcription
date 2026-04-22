@@ -90,8 +90,8 @@ Examples:
 
         parser.add_argument(
             "--llm-model",
-            default="qwen3.5",
-            help="LLM model for content generation (default: qwen3.5)"
+            default="qwen3.5:latest",
+            help="LLM model for content generation (default: qwen3.5:latest)"
         )
 
         # UI options
@@ -103,34 +103,9 @@ Examples:
 
         # Performance options
         parser.add_argument(
-            "--no-optimizations",
-            action="store_true",
-            help="Disable performance optimizations"
-        )
-
-        parser.add_argument(
-            "--max-workers",
-            type=int,
-            help="Maximum number of worker threads (auto-detect if not specified)"
-        )
-
-        parser.add_argument(
             "--device",
             choices=["auto", "cpu", "cuda", "mps"],
             help="Computation device (auto-detect if not specified)"
-        )
-
-        parser.add_argument(
-            "--no-batch",
-            action="store_true",
-            help="Disable batch processing"
-        )
-
-        parser.add_argument(
-            "--batch-size",
-            type=int,
-            default=4,
-            help="Batch size for batch processing (default: 4)"
         )
 
         # Validation options
@@ -188,14 +163,10 @@ Examples:
             "target": target,
             "generate_pdf": target == "pdf" and not getattr(args, "no_pdf", False),
             "whisper_model": getattr(args, "whisper_model", "medium"),
-            "llm_model": getattr(args, "llm_model", "qwen3.5"),
+            "llm_model": getattr(args, "llm_model", "qwen3.5:latest"),
             "verbose": getattr(args, "verbose", False),
             # Performance settings
-            "enable_performance_optimizations": not getattr(args, "no_optimizations", False),
-            "max_workers": getattr(args, "max_workers", None),
             "device": getattr(args, "device", None),
-            "use_batch_processing": not getattr(args, "no_batch", False),
-            "batch_size": getattr(args, "batch_size", 4),
         })
 
         if args.output_dir:

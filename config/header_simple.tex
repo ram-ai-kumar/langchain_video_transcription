@@ -1,0 +1,17 @@
+% Simplified header for PDF generation with code blocks
+% Only includes essential color definitions without complex packages
+
+% Colors
+\usepackage{xcolor}
+\definecolor{headingcolor}{RGB}{0,102,204}      % Rich royal blue
+\definecolor{subheadingcolor}{RGB}{30,144,255}  % Vibrant dodger blue
+\definecolor{emphasiscolor}{RGB}{220,50,47}     % Rich red
+
+% Headers and sections with colors
+\usepackage{titlesec}
+\titleformat{\section}
+  {\Large\bfseries\color{headingcolor}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{subheadingcolor}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{subheadingcolor}}{\thesubsubsection}{1em}{}
