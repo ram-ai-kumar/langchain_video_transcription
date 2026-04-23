@@ -119,13 +119,13 @@ class FileDiscovery:
         paths = {
             "audio_file": dir_path / f"{base}.mp3",
             "transcript_file": dir_path / f"{base}.txt",
-            "study_file": dir_path / f"{base}_study.md",
+            "study_file": dir_path / f"{base}.md",
             "pdf_file": dir_path / f"{base}.pdf"
         }
 
-        # Special handling for image groups is no longer needed; 
+        # Special handling for image groups is no longer needed;
         # image OCR text will be appended to the base transcript file.
-        
+
         return paths
 
     def _is_supported_file(self, file_path: Path) -> bool:

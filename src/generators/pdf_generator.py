@@ -4,8 +4,9 @@ import re
 import shutil
 import subprocess
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
-from typing import List
+from typing import Generator, List
 
 from src.core.config import PipelineConfig
 from src.core.exceptions import PDFGenerationError
@@ -36,6 +37,8 @@ class PDFGenerator:
                     content = f.read()
                     if not content.strip():
                         raise ValueError("Markdown file is empty")
+                    # Sanitize Unicode whitespace to prevent pandoc errors
+                    content = self._sanitize_unicode_whitespace(content)
                     # Check if content has code blocks
                     has_code_blocks = '```' in content
                     # Sanitize code blocks to prevent LaTeX errors
@@ -68,15 +71,7 @@ class PDFGenerator:
                 return self._generate_minimal_from_stdin(content, pdf_abs)
             else:
                 # No code blocks - use original file-based approach with header for colors
-                # Try with tectonic engine first
-                try:
-                    result = self._generate_with_engine(markdown_abs, pdf_abs, "tectonic")
-                    if result.success:
-                        return result
-                except PDFGenerationError:
-                    pass
-
-                # Try with xelatex as fallback (better Unicode support)
+                # Try with xelatex first (better LaTeX compatibility)
                 try:
                     result = self._generate_with_engine(markdown_abs, pdf_abs, "xelatex")
                     if result.success:
@@ -84,8 +79,22 @@ class PDFGenerator:
                 except PDFGenerationError:
                     pass
 
+                # Try with tectonic as fallback
+                try:
+                    result = self._generate_with_engine(markdown_abs, pdf_abs, "tectonic")
+                    if result.success:
+                        return result
+                except PDFGenerationError:
+                    pass
+
                 # Fallback to minimal configuration
-                return self._generate_minimal_fallback(markdown_abs, pdf_abs)
+                try:
+                    return self._generate_minimal_fallback(markdown_abs, pdf_abs)
+                except PDFGenerationError:
+                    pass
+
+                # Final fallback: use stdin approach (no colors, but more compatible)
+                return self._generate_minimal_from_stdin(content, pdf_abs)
 
         except Exception as e:
             raise PDFGenerationError(
@@ -106,6 +115,19 @@ class PDFGenerator:
         if sanitized != path_str:
             return Path(sanitized)
         return path
+
+    @contextmanager
+    def _copy_to_safe_temp(self, markdown_path: Path) -> Generator[Path, None, None]:
+        """Copy markdown to a temp dir with an ASCII-safe filename.
+
+        Tectonic (and some xelatex builds) cannot handle non-ASCII Unicode
+        characters in the input file-system path. Copying to a temp dir
+        with a plain name sidesteps the issue.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            safe_input = Path(tmpdir) / "input.md"
+            shutil.copy2(str(markdown_path), str(safe_input))
+            yield safe_input
 
     def _sanitize_code_blocks(self, content: str) -> str:
         """Sanitize markdown code blocks to prevent LaTeX compilation errors.
@@ -139,23 +161,31 @@ class PDFGenerator:
 
         return '\n'.join(result)
 
+    def _sanitize_unicode_whitespace(self, content: str) -> str:
+        """Sanitize problematic Unicode whitespace characters in markdown content.
+
+        Replaces all space-like Unicode characters (e.g. \u202f, \u00a0, \t)
+        with standard spaces to prevent pandoc LaTeX engine errors.
+        """
+        import re
+        # Replace all Unicode whitespace characters with standard spaces
+        sanitized = re.sub(r'\s', ' ', content)
+        return sanitized
+
     def _generate_from_stdin(self, content: str, pdf_path: Path, engine: str) -> ProcessResult:
         """Generate PDF from content via stdin to avoid file system issues."""
         try:
             from src.utils.subprocess_utils import capture_command_output
-            import shlex
 
             pdf_abs = pdf_path.resolve()
-            pdf_quoted = shlex.quote(str(pdf_abs))
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 temp_pdf = Path(tmpdir) / "output.pdf"
-                temp_pdf_quoted = shlex.quote(str(temp_pdf))
 
                 cmd = [
                     "pandoc",
-                    "-o", temp_pdf_quoted,
-                    "--from", "gfm+lists_without_preceding_blankline",
+                    "-o", str(temp_pdf),
+                    "--from", "markdown+lists_without_preceding_blankline",
                     f"--pdf-engine={engine}",
                     "--variable", "fontsize=12pt",
                     "--toc",
@@ -190,8 +220,7 @@ class PDFGenerator:
     def _generate_minimal_from_stdin(self, content: str, pdf_path: Path) -> ProcessResult:
         """Try minimal PDF generation from content via stdin without header."""
         try:
-            from src.utils.subprocess_utils import run_silent_command
-            import shlex
+            from src.utils.subprocess_utils import capture_command_output
 
             pdf_abs = pdf_path.resolve()
 
@@ -199,18 +228,17 @@ class PDFGenerator:
             try:
                 with tempfile.TemporaryDirectory() as tmpdir:
                     temp_pdf = Path(tmpdir) / "output.pdf"
-                    temp_pdf_quoted = shlex.quote(str(temp_pdf))
                     cmd = [
                         "pandoc",
-                        "-o", temp_pdf_quoted,
-                        "--from", "gfm+lists_without_preceding_blankline",
+                        "-o", str(temp_pdf),
+                        "--from", "markdown+lists_without_preceding_blankline",
                         "--pdf-engine=tectonic",
                         "--variable", "fontsize=12pt",
                         "--wrap=none",
                         "--standalone",
                         "--fail-if-warnings=false",
                     ]
-                    run_silent_command(cmd, input=content.encode('utf-8'))
+                    capture_command_output(cmd, input=content.encode('utf-8'))
                     shutil.move(str(temp_pdf), str(pdf_abs))
 
                 return ProcessResult(
@@ -224,18 +252,17 @@ class PDFGenerator:
                 try:
                     with tempfile.TemporaryDirectory() as tmpdir:
                         temp_pdf = Path(tmpdir) / "output.pdf"
-                        temp_pdf_quoted = shlex.quote(str(temp_pdf))
                         cmd = [
                             "pandoc",
-                            "-o", temp_pdf_quoted,
-                            "--from", "gfm+lists_without_preceding_blankline",
+                            "-o", str(temp_pdf),
+                            "--from", "markdown+lists_without_preceding_blankline",
                             "--pdf-engine=xelatex",
                             "--variable", "fontsize=12pt",
                             "--wrap=none",
                             "--standalone",
                             "--fail-if-warnings=false",
                         ]
-                        run_silent_command(cmd, input=content.encode('utf-8'))
+                        capture_command_output(cmd, input=content.encode('utf-8'))
                         shutil.move(str(temp_pdf), str(pdf_abs))
 
                     return ProcessResult(
@@ -249,17 +276,16 @@ class PDFGenerator:
                     try:
                         with tempfile.TemporaryDirectory() as tmpdir:
                             temp_pdf = Path(tmpdir) / "output.pdf"
-                            temp_pdf_quoted = shlex.quote(str(temp_pdf))
                             cmd = [
                                 "pandoc",
-                                "-o", temp_pdf_quoted,
+                                "-o", str(temp_pdf),
                                 "--from", "gfm",
                                 "--variable", "fontsize=12pt",
                                 "--wrap=none",
                                 "--standalone",
                                 "--fail-if-warnings=false",
                             ]
-                            run_silent_command(cmd, input=content.encode('utf-8'))
+                            capture_command_output(cmd, input=content.encode('utf-8'))
                             shutil.move(str(temp_pdf), str(pdf_abs))
 
                         return ProcessResult(
@@ -285,21 +311,17 @@ class PDFGenerator:
         """Generate PDF without header file to isolate header-related issues."""
         try:
             from src.utils.subprocess_utils import capture_command_output
-            import shlex
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 temp_pdf = Path(tmpdir) / "output.pdf"
                 markdown_abs = markdown_path.resolve()
                 pdf_abs = pdf_path.resolve()
 
-                markdown_quoted = shlex.quote(str(markdown_abs))
-                pdf_quoted = shlex.quote(str(temp_pdf))
-
                 cmd = [
                     "pandoc",
-                    markdown_quoted,
-                    "-o", pdf_quoted,
-                    "--from", "gfm+lists_without_preceding_blankline",
+                    str(markdown_abs),
+                    "-o", str(temp_pdf),
+                    "--from", "markdown+lists_without_preceding_blankline",
                     f"--pdf-engine={engine}",
                     "--variable", "fontsize=12pt",
                     "--toc",
@@ -335,11 +357,12 @@ class PDFGenerator:
         try:
             from src.utils.subprocess_utils import capture_command_output
 
-            with tempfile.TemporaryDirectory() as tmpdir:
-                temp_pdf = Path(tmpdir) / "output.pdf"
-                cmd = self._build_pandoc_command(markdown_path, temp_pdf, engine)
-                capture_command_output(cmd, text=True)
-                shutil.move(str(temp_pdf), str(pdf_path))
+            with self._copy_to_safe_temp(markdown_path) as safe_input:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    temp_pdf = Path(tmpdir) / "output.pdf"
+                    cmd = self._build_pandoc_command(safe_input, temp_pdf, engine)
+                    capture_command_output(cmd, text=True)
+                    shutil.move(str(temp_pdf), str(pdf_path))
 
             return ProcessResult(
                 success=True,
@@ -378,45 +401,23 @@ class PDFGenerator:
     def _generate_minimal_fallback(self, markdown_path: Path, pdf_path: Path) -> ProcessResult:
         """Try minimal PDF generation without header and fancy options."""
         try:
-            from src.utils.subprocess_utils import run_silent_command
+            from src.utils.subprocess_utils import capture_command_output
 
-            # First try with tectonic
-            try:
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    temp_pdf = Path(tmpdir) / "output.pdf"
-                    cmd = [
-                        "pandoc",
-                        str(self._sanitize_path(markdown_path)),
-                        "-o", str(self._sanitize_path(temp_pdf)),
-                        "--from", "markdown+lists_without_preceding_blankline",
-                        "--pdf-engine=tectonic",
-                        "--variable", "fontsize=12pt",
-                        "--fail-if-warnings=false",
-                    ]
-                    run_silent_command(cmd)
-                    shutil.move(str(temp_pdf), str(pdf_path))
-
-                return ProcessResult(
-                    success=True,
-                    output_path=pdf_path,
-                    message="Generated PDF with minimal configuration (tectonic)",
-                    metadata={"fallback_mode": True, "engine": "tectonic"}
-                )
-            except subprocess.CalledProcessError as e:
-                # Try with xelatex instead
+            with self._copy_to_safe_temp(markdown_path) as safe_input:
+                # First try with xelatex (better LaTeX compatibility)
                 try:
                     with tempfile.TemporaryDirectory() as tmpdir:
                         temp_pdf = Path(tmpdir) / "output.pdf"
                         cmd = [
                             "pandoc",
-                            str(self._sanitize_path(markdown_path)),
-                            "-o", str(self._sanitize_path(temp_pdf)),
+                            str(safe_input),
+                            "-o", str(temp_pdf),
                             "--from", "markdown+lists_without_preceding_blankline",
                             "--pdf-engine=xelatex",
                             "--variable", "fontsize=12pt",
                             "--fail-if-warnings=false",
                         ]
-                        run_silent_command(cmd)
+                        capture_command_output(cmd)
                         shutil.move(str(temp_pdf), str(pdf_path))
 
                     return ProcessResult(
@@ -425,34 +426,57 @@ class PDFGenerator:
                         message="Generated PDF with minimal configuration (xelatex)",
                         metadata={"fallback_mode": True, "engine": "xelatex"}
                     )
-                except subprocess.CalledProcessError as e2:
-                    # Try with default latex engine as last resort
+                except subprocess.CalledProcessError as e:
+                    # Try with tectonic as fallback
                     try:
                         with tempfile.TemporaryDirectory() as tmpdir:
                             temp_pdf = Path(tmpdir) / "output.pdf"
                             cmd = [
                                 "pandoc",
-                                str(self._sanitize_path(markdown_path)),
-                                "-o", str(self._sanitize_path(temp_pdf)),
-                                "--from", "markdown",
+                                str(safe_input),
+                                "-o", str(temp_pdf),
+                                "--from", "markdown+lists_without_preceding_blankline",
+                                "--pdf-engine=tectonic",
                                 "--variable", "fontsize=12pt",
                                 "--fail-if-warnings=false",
                             ]
-                            run_silent_command(cmd)
+                            capture_command_output(cmd)
                             shutil.move(str(temp_pdf), str(pdf_path))
 
                         return ProcessResult(
                             success=True,
                             output_path=pdf_path,
-                            message="Generated PDF with minimal configuration (default latex)",
-                            metadata={"fallback_mode": True, "engine": "default"}
+                            message="Generated PDF with minimal configuration (tectonic)",
+                            metadata={"fallback_mode": True, "engine": "tectonic"}
                         )
-                    except subprocess.CalledProcessError as e3:
-                        # If all fail, raise the original error
-                        raise PDFGenerationError(
-                            f"Minimal PDF generation failed (tectonic, xelatex, and default): {self._extract_error_message(e)}",
-                            processor="PDFGenerator"
-                        )
+                    except subprocess.CalledProcessError as e2:
+                        # Try with default latex engine as last resort
+                        try:
+                            with tempfile.TemporaryDirectory() as tmpdir:
+                                temp_pdf = Path(tmpdir) / "output.pdf"
+                                cmd = [
+                                    "pandoc",
+                                    str(safe_input),
+                                    "-o", str(temp_pdf),
+                                    "--from", "markdown",
+                                    "--variable", "fontsize=12pt",
+                                    "--fail-if-warnings=false",
+                                ]
+                                capture_command_output(cmd)
+                                shutil.move(str(temp_pdf), str(pdf_path))
+
+                            return ProcessResult(
+                                success=True,
+                                output_path=pdf_path,
+                                message="Generated PDF with minimal configuration (default latex)",
+                                metadata={"fallback_mode": True, "engine": "default"}
+                            )
+                        except subprocess.CalledProcessError as e3:
+                            # If all fail, raise the original error
+                            raise PDFGenerationError(
+                                f"Minimal PDF generation failed (xelatex, tectonic, and default): {self._extract_error_message(e)}",
+                                processor="PDFGenerator"
+                            )
 
         except subprocess.CalledProcessError as e:
             raise PDFGenerationError(

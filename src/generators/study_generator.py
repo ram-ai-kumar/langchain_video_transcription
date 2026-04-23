@@ -32,7 +32,7 @@ class StudyMaterialGenerator:
 
             # Generate output paths — sanitize to guard against \u202f in transcript stem
             base_name = re.sub(r'\s', ' ', transcript_path.stem)
-            study_file = output_dir / f"{base_name}_study.md"
+            study_file = output_dir / f"{base_name}.md"
 
             # Check if source was a PDF to avoid overwriting original
             if self._was_source_pdf(transcript_path):
@@ -159,7 +159,7 @@ class StudyMaterialGenerator:
                 "prompt_file": str(self.config.prompt_file)
             }
         }
-        
+
         if self._llm_processor:
             info["llm_info"] = self._llm_processor.get_model_info()
         else:
