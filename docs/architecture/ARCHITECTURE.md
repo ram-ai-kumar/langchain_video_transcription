@@ -72,17 +72,20 @@ The heart of the system that orchestrates the entire processing workflow:
   - **File Discovery**: Groups files by stem (filename without extension)
   - **Three-Pass Processing**: Implements intelligent processing order
   - **Conflict Resolution**: Handles mixed media with same stem names
-  - **Progress Tracking**: Monitors and reports processing status
+  - **Progress Tracking**: Monitors and reports processing status via ProgressTracker
 - **Processing Flow**:
-  1. **Pass 1**: Process video/audio/text groups (priority: video > audio > text)
-  2. **Pass 2**: Process image groups (including those sharing stems with other media)
-  3. **Pass 3**: Process loose images (folder-wide processing)
+  1. **Sequential Processing**: Files are processed one-by-one in deterministic order
+  2. **Pass 1**: Process video/audio/text groups (priority: video > audio > text)
+  3. **Pass 2**: Process image groups (including those sharing stems with other media)
+  4. **Pass 3**: Process loose images (folder-wide processing)
 - **Key Methods**:
   - `process_directory()`: Main entry point for directory processing
   - `process_single_source()`: Processes individual media files through the pipeline
   - `_process_media_groups()`: Handles Pass 1 processing
   - `_process_image_groups()`: Handles Pass 2 processing
   - `_process_loose_images()`: Handles Pass 3 processing
+  - `_migrate_legacy_unsanitized_files()`: Migrates old unsanitized filenames
+  - `_migrate_legacy_study_files()`: Migrates old _study.md suffix files
 - **Idempotency**: Checks for existing artifacts and skips regeneration
 
 ### 4. Processors (`src/processors/`)
@@ -201,6 +204,7 @@ Supporting utilities for file operations, media handling, and UI:
   - `group_files_by_stem()`: Groups files by filename stem
   - `find_primary_source()`: Determines processing priority
   - `get_output_paths()`: Generates standard output paths
+  - `separate_image_files()`: Separates image files from other media types
 
 **File Manager (`file_utils.py`)**:
 
@@ -216,6 +220,33 @@ Supporting utilities for file operations, media handling, and UI:
   - `get_file_size()`: Returns file size
   - `is_file_empty()`: Checks for empty files
 
+**Progress Tracking (`progress_tracker.py`)**:
+
+- **Class**: `ProgressTracker`
+- **Capabilities**:
+  - Tracks file processing stages
+  - Displays real-time in-place progress
+  - Shows current stage for each file
+- **Purpose**: Provides clean, real-time progress feedback
+
+**Error Logging (`error_logger.py`)**:
+
+- **Class**: `ErrorLogger`
+- **Capabilities**:
+  - Logs errors with structured format
+  - Maintains error log file
+  - Provides error summary
+- **Purpose**: Centralized error tracking and analysis
+
+**Error Summarization (`error_summarizer.py`)**:
+
+- **Class**: `ErrorSummarizer`
+- **Capabilities**:
+  - AI-powered error analysis using LLM
+  - Generates human-readable error summaries
+  - Provides actionable insights
+- **Purpose**: Intelligent error diagnosis and explanation
+
 **Media Utilities (`media_utils.py`)**:
 
 - **Classes**:
@@ -230,9 +261,7 @@ Supporting utilities for file operations, media handling, and UI:
 - **Classes**:
   - `ColorFormatter`: Terminal color formatting
   - `StatusReporter`: Status message reporting
-  - `ProgressReporter`: Progress tracking
-  - `Spinner`: Animated progress spinner
-- **Purpose**: User-friendly CLI output and progress indication
+- **Purpose**: User-friendly CLI output and status indication
 
 ### 7. Configuration (`src/core/config.py`)
 
@@ -290,9 +319,9 @@ The architecture employs several design patterns:
    - Common validation and path handling in base class
 
 4. **Observer Pattern**:
-   - Progress reporting and UI updates
-   - `StatusReporter` and `ProgressReporter` observe processing events
-   - Decouples processing logic from UI updates
+   - Progress reporting and status updates
+   - `StatusReporter` and `ProgressTracker` observe processing events
+   - Decouples processing logic from status updates
 
 5. **Command Pattern**:
    - Processing operations encapsulated as methods
@@ -389,6 +418,7 @@ src/
 ├── processors/              # Media processors (Strategy Pattern)
 │   ├── base.py              # Abstract base processor
 │   ├── audio_processor.py   # Audio transcription
+│   ├── enhanced_audio_processor.py  # Enhanced audio with performance tracking
 │   ├── image_processor.py   # Image OCR
 │   ├── text_processor.py   # Text validation
 │   └── llm_processor.py     # LLM-based generation
@@ -400,7 +430,12 @@ src/
 ├── utils/                   # Supporting utilities
 │   ├── file_utils.py        # File operations and discovery
 │   ├── media_utils.py       # Media type detection and factory
-│   └── ui_utils.py          # CLI UI and progress reporting
+│   ├── ui_utils.py          # CLI UI and status reporting
+│   ├── progress_tracker.py  # Progress tracking
+│   ├── error_logger.py      # Error logging
+│   ├── error_summarizer.py  # AI-powered error analysis
+│   ├── subprocess_utils.py  # Subprocess execution
+│   └── whisper_utils.py     # Whisper model utilities
 │
 └── cli/                     # Command-line interface
     └── main.py              # CLI implementation
@@ -408,16 +443,16 @@ src/
 
 ## Technology Stack
 
-| Stage                    | Tool / Technology                   | Purpose                              |
-| ------------------------ | ----------------------------------- | ------------------------------------ |
-| Video → Audio            | **ffmpeg**                          | Reliable audio extraction            |
-| Audio → Text             | **Whisper**                         | State-of-the-art transcription       |
-| Images → Text            | **Tesseract OCR**                   | Optical character recognition        |
-| Text → Summary           | **LangChain Core** + **Ollama LLM** | Prompt orchestration & summarization |
-| Summary → Study Material | **LangChain PromptTemplate**        | Rich, structured learning content    |
-| Study Prompt             | **config/study_prompt.txt**         | Externalized customization of output |
-| Markdown → PDF           | **Pandoc** + **Tectonic**           | Professional document generation     |
-| CLI UX                   | **Python sys.stdout + spinner**     | User-friendly progress visualization |
+| Stage                    | Tool / Technology                    | Purpose                               |
+| ------------------------ | ------------------------------------ | ------------------------------------- |
+| Video → Audio            | **ffmpeg**                           | Reliable audio extraction             |
+| Audio → Text             | **Whisper**                          | State-of-the-art transcription        |
+| Images → Text            | **Tesseract OCR**                    | Optical character recognition         |
+| Text → Summary           | **LangChain Core** + **Ollama LLM**  | Prompt orchestration & summarization  |
+| Summary → Study Material | **LangChain PromptTemplate**         | Rich, structured learning content     |
+| Study Prompt             | **config/study_prompt.txt**          | Externalized customization of output  |
+| Markdown → PDF           | **Pandoc** + **Tectonic**            | Professional document generation      |
+| CLI UX                   | **ProgressTracker + StatusReporter** | Real-time progress and status display |
 
 ---
 

@@ -24,9 +24,14 @@
 - **Docker Support (Zero-Install)**: Run the pipeline via a clean Docker container, eliminating the need to install host dependencies like `ffmpeg`, `tesseract`, or `pandoc`.
 - **Optimized Resource Usage**: Models (Whisper and Ollama) are strictly lazy-loaded into VRAM only at the exact moment their specific processing tasks (e.g. audio transcription or chapter generation) begin.
 - **Smart File Naming**: Conflict-aware naming for mixed media (`{stem}_images.txt` for conflicts, `{stem}.txt` for clean cases).
-- **CLI Experience**: Clean, readable progress updates with dynamic pipeline paths and spinners.
+- **Sequential Processing**: Files are processed one-by-one in deterministic order for maximum reliability and predictable resource usage.
+- **Target-Based Pipeline**: Stop at any stage with `--target audio/text/markdown/pdf` for efficient processing.
+- **Interactive CLI**: Prompts for desired output target when not specified, with clear menu options.
+- **Progress Tracking**: Real-time in-place progress display showing current processing stage for each file.
+- **AI-Powered Error Analysis**: Automatic error summarization using LLM to diagnose and explain processing failures.
+- **Legacy File Migration**: Automatically migrates old unsanitized filenames and `_study.md` suffix files to current format.
 - **Comprehensive CLI Options**: Full command-line interface with configuration files, dependency checking, and validation modes.
-- **Robust Error Handling**: Graceful fallbacks and detailed error reporting for PDF generation issues.
+- **Robust Error Handling**: Graceful fallbacks, detailed error logging, and pipeline continuation despite individual failures.
 
 ---
 
@@ -39,12 +44,14 @@
 - International characters and diacritics
 - Automatic engine selection for optimal rendering
 
-### Error Recovery
+### Error Recovery & Analysis
 
 - Multi-engine PDF generation with automatic fallbacks
 - Detailed error reporting and debugging information
 - Graceful degradation when PDF generation fails
 - Pipeline continuation despite individual failures
+- AI-powered error summarization for intelligent failure diagnosis
+- Structured error logging with automatic summary generation
 
 ### Mixed Media Intelligence
 
@@ -52,3 +59,10 @@
 - Priority-based processing (video > audio > text > images)
 - Separate processing tracks for different media types
 - Comprehensive coverage of all content in mixed folders
+
+### Processing Efficiency
+
+- Sequential processing eliminates race conditions and resource contention
+- Bounded memory usage regardless of directory size
+- Deterministic processing order for reproducible results
+- Clean shutdown with proper resource cleanup on interrupt

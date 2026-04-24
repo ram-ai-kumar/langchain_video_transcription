@@ -36,7 +36,7 @@ As organizations adopt GenAI, Large Language Models (LLMs) introduce unique atta
 
 - **Resource Limits:** Strict bounds on maximum input size (video/audio lengths) are enforced before models are invoked.
 - **Lazy Loading & Timeouts:** Models are lazy-loaded dynamically and governed by strict circuit-breaker timeouts. Infinite generation loops are aggressively terminated.
-- **Concurrency Locks:** Thread pools prevent excessive parallel requests from exhausting host VRAM/CPU.
+- **Sequential Processing:** Files are processed one-by-one with bounded memory usage, preventing resource exhaustion regardless of directory size.
 
 ### LLM05: Supply Chain Vulnerabilities
 

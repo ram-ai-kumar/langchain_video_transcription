@@ -41,8 +41,7 @@ All external inputs — CLI arguments, config files, media payloads — are vali
 - **Memory Limits**: Configurable caps on memory usage during heavy media processing.
 - **Lazy Model Loading**: Whisper and Ollama are loaded into VRAM only when their specific pipeline stage runs, then released. This prevents OOM failures and lowers minimum hardware requirements.
 - **Zero-Footprint Validation**: LLM availability is checked via a lightweight HTTP ping to `/api/tags` — model weights are never loaded during dependency checks.
-- **Sequential Processing**: Files are processed one-by-one in deterministic order, keeping I/O and memory pressure bounded even on directories with hundreds of files.
-- **Thread-Safe State**: All shared counters, sets, and progress state are protected by `threading.Lock`.
+- **Sequential Processing**: Files are processed one-by-one in deterministic order, keeping I/O and memory pressure bounded even on directories with hundreds of files, eliminating thread-safety concerns.
 - **Automatic Cleanup**: Temporary files (extracted audio, intermediate artifacts) are cleaned up on both success and failure paths.
 
 ---

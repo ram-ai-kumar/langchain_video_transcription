@@ -4,9 +4,9 @@ For enterprise adoption of AI, a platform must not only be secure but also **sca
 
 ## 🚀 The Business Value of Scalability
 
-1. **Cost Efficiency:** AI models are computationally expensive. By dynamically managing resources, the platform prevents the need for excessive, always-on infrastructure (e.g., permanent high-tier GPUs).
+1. **Cost Efficiency:** AI models are computationally expensive. By dynamically managing resources through lazy-loading and sequential processing, the platform prevents the need for excessive, always-on infrastructure (e.g., permanent high-tier GPUs).
 2. **Operational Predictability:** Containerization ensures that what works in a developer's environment functions identically in a production data center.
-3. **High Throughput:** Concurrent pipeline logic allows for batch processing of vast media archives (e.g., thousands of hours of meeting recordings) in a fraction of the time.
+3. **Predictable Throughput:** Sequential processing with deterministic ordering provides reliable, bounded resource usage for batch processing of media archives (e.g., thousands of hours of meeting recordings) with consistent performance characteristics.
 
 ---
 
@@ -32,7 +32,7 @@ Large Language Models (LLMs) and speech-to-text engines (Whisper) require massiv
 
 Scalability goes hand-in-hand with resilience. As throughput scales, so does the risk of cascading failures.
 
-- **Micro-Segmentation of Failures (Bulkhead):** If one node or thread encounters a critical error (such as a corrupted media file), that specific process is isolated and terminated securely, while the rest of the concurrent batch continues unhindered.
+- **Micro-Segmentation of Failures (Bulkhead):** If one file encounters a critical error (such as a corrupted media file), that specific file's processing is isolated and logged securely, while the rest of the batch continues unhindered.
 - **Idempotent Retry Logic:** Transient failures (such as a local model timing out under heavy load) trigger an exponential backoff retry. Operations are idempotent, meaning retrying an operation will not duplicate data or corrupt state.
 - **Graceful Degradation:** If an advanced AI model fails to load, the system degrades to standard deterministic mechanisms whenever possible rather than generating a fatal exception.
 
@@ -50,10 +50,10 @@ Optimizing model inference time is critical for enterprise throughput. The platf
 
 While the platform is efficient, baseline hardware recommendations scale with workload demands:
 
-| Tier                    | Use Case                                        | Recommended Hardware                                  | Scalability Strategy                                                        |
-| ----------------------- | ----------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------- |
-| **Standard**            | Daily departmental use, sequential processing.  | 16GB RAM, 8-Core CPU (or M-Series Mac).               | Docker `.venv` or single container run. Models loaded sequentially.         |
-| **Enterprise Batch**    | Large archive ingestion, concurrent operations. | 32GB+ RAM, 16-Core CPU, dedicated GPU (Nvidia/Metal). | Multiple worker threads enabled. GPU acceleration for Whisper/Ollama.       |
-| **Distributed / Cloud** | Organization-wide shared service.               | Kubernetes Cluster w/ dynamic GPU node pools.         | Helm chart deployment. Horizontal Pod Autoscaling based on VRAM/CPU alerts. |
+| Tier                    | Use Case                                         | Recommended Hardware                                  | Scalability Strategy                                                        |
+| ----------------------- | ------------------------------------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------- |
+| **Standard**            | Daily departmental use, sequential processing.   | 16GB RAM, 8-Core CPU (or M-Series Mac).               | Docker `.venv` or single container run. Models loaded sequentially.         |
+| **Enterprise Batch**    | Large archive ingestion, predictable throughput. | 32GB+ RAM, 16-Core CPU, dedicated GPU (Nvidia/Metal). | Sequential processing with GPU acceleration for Whisper/Ollama.             |
+| **Distributed / Cloud** | Organization-wide shared service.                | Kubernetes Cluster w/ dynamic GPU node pools.         | Helm chart deployment. Horizontal Pod Autoscaling based on VRAM/CPU alerts. |
 
 > *By blending containerized agility with strict resource governance and intelligent lazy-loading, the platform ensures that enterprise AI initiatives remain financially and operationally sustainable.*

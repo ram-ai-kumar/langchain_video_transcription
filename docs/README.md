@@ -13,8 +13,8 @@ System design, security posture, and compliance reference:
 | Document                                                                | Contents                                                                                                 |
 | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | [ARCHITECTURE.md](./architecture/ARCHITECTURE.md)                       | Layered architecture, component design, patterns, technology stack                                       |
-| [PROCESSING_ARCHITECTURE.md](./architecture/PROCESSING_ARCHITECTURE.md) | Three-pass processing pipeline, sequential processing                                                    |
-| [ENTERPRISE_SCALABILITY.md](./architecture/ENTERPRISE_SCALABILITY.md)   | Scalability mechanisms, lazy-loading, hardware sizing guidance                                           |
+| [PROCESSING_ARCHITECTURE.md](./architecture/PROCESSING_ARCHITECTURE.md) | Three-pass processing pipeline, sequential processing, conflict resolution                               |
+| [ENTERPRISE_SCALABILITY.md](./architecture/ENTERPRISE_SCALABILITY.md)   | Resource efficiency, lazy-loading, hardware sizing guidance                                              |
 | [SECURITY.md](./architecture/SECURITY.md)                               | Zero Trust Architecture, input validation, GRC mappings (SOC2 / ISO27001 / NIST / PCI DSS / CIS / OWASP) |
 | [OWASP_LLM_TOP_10.md](./architecture/OWASP_LLM_TOP_10.md)               | AI-specific threat mitigations mapped to OWASP LLM Top 10                                                |
 

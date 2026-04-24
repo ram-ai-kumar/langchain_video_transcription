@@ -40,15 +40,7 @@
    python main.py ./data
    ```
 
-   The pipeline scans the folder and renders a visual tree:
-
-   ```text
-   📁 data/
-   ├── 📁 mobile_app/
-   │   ├── [############################] ✓ login_flow.mp4
-   │   └── [############################] ⏭ user_testing.mp3 (Skipped)
-   └── [############################] ✓ overview.mp4
-   ```
+   The pipeline scans the folder and processes files sequentially:
 
 3. **Interactive Prompt or Explicit Targets**
    - Without `--target`, the CLI prompts for the desired output format interactively — allowing you to skip heavy AI models if you only need transcripts.
@@ -107,10 +99,10 @@ The progress display updates in-place, providing clean, real-time feedback witho
 
 1. **Inspect outputs** — for each logical item:
    - Transcript: `<name>.txt` (image OCR is cleanly appended to existing transcripts)
-   - Study guide (Markdown): `<name>_study.md`
+   - Study guide (Markdown): `<name>.md`
    - PDF (if enabled and Pandoc/Tectonic are installed): `<name>.pdf`
 
-2. **Re-running is safe** — the pipeline is **idempotent**: existing artifacts are reused and only missing pieces are generated. Skipped files are reported as `[⏭ Skipped]`.
+2. **Re-running is safe** — the pipeline is **idempotent**: existing artifacts are reused and only missing pieces are generated.
 
 ---
 
@@ -145,8 +137,6 @@ python main.py /path/to/media/folder --validate-only
 # Use a configuration file
 python main.py /path/to/media/folder --config config.json
 
-# Disable progress spinner
-python main.py /path/to/media/folder --no-spinner
 
 # Performance overrides
 python main.py /path/to/media/folder --device cuda --whisper-model large
@@ -186,24 +176,13 @@ The file must contain a `{transcript}` placeholder where the source text will be
 
 ---
 
-## Example CLI Output
+## Error Handling
 
-The pipeline dynamically renders the processing path based on detected media content:
+If processing encounters errors, the pipeline provides:
 
-```text
-AI is warming up... ready to crunch some knowledge.
+- **Detailed error messages** with context about which file and stage failed
+- **Error summary** showing counts of different error types
+- **AI-powered error analysis** using the LLM to diagnose and explain failures
+- **Error log file** saved to `~/.cache/video_transcription/errors.txt`
 
-# Mixed Media Folder
-lecture1.mp4
-    video > audio > transcript > study material > PDF
-
-slides01.png + slides01.jpg
-    images (2) > transcript > study material > PDF
-
-lecture1.mp4 + lecture1.png
-    video > audio > transcript > study material > PDF
-    images (1) > transcript > study material > PDF
-
-random.gif (loose image)
-    images (1) > transcript > study material > PDF
-```
+The pipeline continues processing remaining files even if individual files fail, ensuring maximum throughput.

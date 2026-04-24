@@ -8,32 +8,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ## **Critical Improvements (Immediate Priority)**
 
-### **1. Refactor: Remove UI Code, Switch to Sequential Processing** ✅ **COMPLETED**
-
-**Goal**: Replace the concurrent sliding-window scheduler and all polished UI code (Rich progress bars, tree visualization, progress simulators, resource manager) with simple sequential one-by-one file processing, while keeping all pipeline functionality intact.
-
-**Scope**: Removed UI-specific components including:
-
-- Rich `Progress`/spinner/bar and `ProgressReporter` class
-- `ProgressSimulator`, `ProgressParser`, `RealtimeProgress` components
-- `ResourceManager` and concurrency scaffolding
-- Sliding window scheduler with `concurrent.futures`
-- CLI args: `--max-workers`, `--no-batch`, `--batch-size`, `--no-optimizations`
-
-**Key Changes**:
-
-- ✅ Deleted UI files: `simple_progress.py`, `progress_subprocess.py`, `realtime_progress.py`, `resource_manager.py`
-- ✅ Simplified `ui_utils.py` to keep only `StatusReporter` and `ColorFormatter`
-- ✅ Refactored `pipeline.py` to use sequential processing via existing `_process_*` helpers
-- ✅ Updated tests and documentation
-
-**Impact**: Significant simplification, removal of Rich dependency, cleaner codebase while maintaining all core functionality.
-
-**Details**: See complete implementation plan in [plan.md](./plan.md)
-
----
-
-### **2. Populate the `src/domain/` Layer**
+### **1. Populate the `src/domain/` Layer**
 
 **Current State**: `src/domain/` does not exist; business logic is scattered across processors and the pipeline
 
@@ -48,7 +23,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ---
 
-### **3. Configuration Validation with Pydantic**
+### **2. Configuration Validation with Pydantic**
 
 **Current State**: `PipelineConfig` is a plain `@dataclass` — invalid values (e.g., `whisper_model="huge"`) fail late in the pipeline with cryptic errors
 
@@ -82,7 +57,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ## **Medium-Term Enhancements**
 
-### **4. Enterprise GRC & Security Capabilities**
+### **3. Enterprise GRC & Security Capabilities**
 
 **Current State**: Comprehensive local security and basic logging, but lacking integrations for enterprise-scale centralized auditing and privacy enforcement.
 
@@ -96,7 +71,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ---
 
-### **5. Temporary File Cleanup**
+### **4. Temporary File Cleanup**
 
 **Current State**: Audio extracted from video (`.wav`/`.mp3` temp files) is not guaranteed to be cleaned up when processing fails mid-run
 
@@ -118,7 +93,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ---
 
-### **6. LLM Connection Reuse + Retry**
+### **5. LLM Connection Reuse + Retry**
 
 **Current State**: A new `OllamaLLM` instance is created per file; `tenacity` is already in `requirements.txt` but unused
 
@@ -141,7 +116,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ---
 
-### **7. Error Handling & Resilience**
+### **6. Error Handling & Resilience**
 
 **Current State**: Basic exception handling with custom types; transient failures abort processing
 
@@ -155,7 +130,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ---
 
-### **8. Security & Input Validation**
+### **7. Security & Input Validation**
 
 **Current State**: Basic file existence checks only
 
@@ -170,7 +145,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ---
 
-### **9. Code Quality & Developer Experience**
+### **8. Code Quality & Developer Experience**
 
 **Current State**: Good structure but missing tooling; type hints exist but are not enforced
 
@@ -199,7 +174,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ## **Nice-to-Have / Polish**
 
-### **10. OCR Quality Improvement**
+### **9. OCR Quality Improvement**
 
 **Current State**: Raw `pytesseract.image_to_string()` with default config gives poor results on lecture slides with dark backgrounds or small fonts
 
@@ -213,7 +188,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ---
 
-### **11. Whisper Model Caching Across Runs**
+### **10. Whisper Model Caching Across Runs**
 
 **Current State**: The Whisper model is loaded once per pipeline invocation but reloaded on every new run, which is slow
 
@@ -227,7 +202,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ---
 
-### **12. Study Prompt Versioning**
+### **11. Study Prompt Versioning**
 
 **Current State**: `config/study_prompt.txt` is a flat text file with no version metadata; impossible to tell which prompt version produced which study material
 
@@ -241,7 +216,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ---
 
-### **13. Dependency Management with `pip-compile`**
+### **12. Dependency Management with `pip-compile`**
 
 **Current State**: `requirements.txt` lists 54 packages, many of which are transitive dependencies mixed with direct ones
 
@@ -254,7 +229,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ---
 
-### **14. Clarify `src/domain/` Naming**
+### **13. Clarify `src/domain/` Naming**
 
 **Current State**: The directory is labeled `domain/` (DDD language) but `src/core/pipeline.py` is doing the actual domain orchestration; `src/domain/` doesn't exist yet
 
@@ -267,7 +242,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ---
 
-### **15. Enhanced CLI Features & Interactive Prompts**
+### **14. Enhanced CLI Features & Interactive Prompts**
 
 **Current State**: `--target` and interactive fallback prompt are implemented. Users can pass `--target text/markdown/pdf` to stop the pipeline early, or omit it to be prompted interactively.
 
@@ -280,7 +255,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ---
 
-### **16. Plugin Architecture**
+### **15. Plugin Architecture**
 
 **Proposed Enhancement**: Allow custom processors and generators via a plugin system
 
@@ -298,7 +273,7 @@ class PluginManager:
 
 ---
 
-### **17. REST API Interface**
+### **16. REST API Interface**
 
 **Proposed Enhancement**: Web interface for remote processing
 
@@ -321,7 +296,7 @@ async def get_job_status(job_id: str):
 
 ---
 
-### **18. Database Integration**
+### **17. Database Integration**
 
 **Proposed Enhancement**: Metadata storage and search capabilities
 
@@ -336,7 +311,7 @@ async def get_job_status(job_id: str):
 
 ---
 
-### **19. Advanced PDF Features**
+### **18. Advanced PDF Features**
 
 **Proposed Enhancement**: Enhanced PDF generation with more customization
 
