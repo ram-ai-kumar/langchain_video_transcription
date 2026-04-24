@@ -28,16 +28,7 @@ Large Language Models (LLMs) and speech-to-text engines (Whisper) require massiv
 - **Graceful Resource Release:** The system automatically cleans up memory pipelines, ensuring that sequential processing doesn't cause Out-Of-Memory (OOM) failures over time.
 - **Business Impact:** This dramatically lowers the hardware requirements to run the software. Enterprises can run the platform on more cost-effective hardware while still acting on large inputs.
 
-### 3. Sliding Window Scheduler
-
-To handle enterprise-scale directories without resource exhaustion, the system uses a bounded sliding window rather than an unbounded thread pool.
-
-- **Window size: 4** — at most 4 files are loaded (2 running + 2 queued) at any moment. As each file completes, the next unseen file enters the window, keeping memory and I/O pressure constant regardless of directory size.
-- **Concurrency: 2** — at most 2 files execute simultaneously, preventing LLM and Whisper from competing for VRAM under concurrent load.
-- **Thread-Safe State**: Output generation, temporary file creation, and progress reporting are protected by `threading.Lock`, preventing state corruption during parallel operations.
-- **Configurable Constants**: `PIPELINE_WINDOW_SIZE` and `PIPELINE_CONCURRENCY` in `src/core/pipeline.py` can be tuned by administrators for dedicated GPU nodes.
-
-### 4. Bulkhead & Resiliency Patterns
+### 3. Bulkhead & Resiliency Patterns
 
 Scalability goes hand-in-hand with resilience. As throughput scales, so does the risk of cascading failures.
 
@@ -45,7 +36,7 @@ Scalability goes hand-in-hand with resilience. As throughput scales, so does the
 - **Idempotent Retry Logic:** Transient failures (such as a local model timing out under heavy load) trigger an exponential backoff retry. Operations are idempotent, meaning retrying an operation will not duplicate data or corrupt state.
 - **Graceful Degradation:** If an advanced AI model fails to load, the system degrades to standard deterministic mechanisms whenever possible rather than generating a fatal exception.
 
-### 5. Hardware Acceleration (Apple Silicon / GPU)
+### 4. Hardware Acceleration (Apple Silicon / GPU)
 
 Optimizing model inference time is critical for enterprise throughput. The platform implements dynamic hardware detection to bind computation to the most efficient accelerator available:
 
@@ -59,10 +50,10 @@ Optimizing model inference time is critical for enterprise throughput. The platf
 
 While the platform is efficient, baseline hardware recommendations scale with workload demands:
 
-| Tier | Use Case | Recommended Hardware | Scalability Strategy |
-| --- | --- | --- | --- |
-| **Standard** | Daily departmental use, sequential processing. | 16GB RAM, 8-Core CPU (or M-Series Mac). | Docker `.venv` or single container run. Models loaded sequentially. |
-| **Enterprise Batch** | Large archive ingestion, concurrent operations. | 32GB+ RAM, 16-Core CPU, dedicated GPU (Nvidia/Metal). | Multiple worker threads enabled. GPU acceleration for Whisper/Ollama. |
-| **Distributed / Cloud** | Organization-wide shared service. | Kubernetes Cluster w/ dynamic GPU node pools. | Helm chart deployment. Horizontal Pod Autoscaling based on VRAM/CPU alerts. |
+| Tier                    | Use Case                                        | Recommended Hardware                                  | Scalability Strategy                                                        |
+| ----------------------- | ----------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------- |
+| **Standard**            | Daily departmental use, sequential processing.  | 16GB RAM, 8-Core CPU (or M-Series Mac).               | Docker `.venv` or single container run. Models loaded sequentially.         |
+| **Enterprise Batch**    | Large archive ingestion, concurrent operations. | 32GB+ RAM, 16-Core CPU, dedicated GPU (Nvidia/Metal). | Multiple worker threads enabled. GPU acceleration for Whisper/Ollama.       |
+| **Distributed / Cloud** | Organization-wide shared service.               | Kubernetes Cluster w/ dynamic GPU node pools.         | Helm chart deployment. Horizontal Pod Autoscaling based on VRAM/CPU alerts. |
 
 > *By blending containerized agility with strict resource governance and intelligent lazy-loading, the platform ensures that enterprise AI initiatives remain financially and operationally sustainable.*

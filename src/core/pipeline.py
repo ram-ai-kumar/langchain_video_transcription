@@ -21,6 +21,7 @@ from src.utils.file_utils import FileDiscovery, FileManager
 from src.utils.ui_utils import StatusReporter
 from src.utils.media_utils import MediaTypeDetector, MediaProcessorFactory
 from src.utils.progress_tracker import ProgressTracker
+from src.utils.error_logger import ErrorLogger
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -76,6 +77,7 @@ class VideoTranscriptionPipeline:
         self.file_discovery = FileDiscovery(config)
         self.study_generator = StudyMaterialGenerator(config)
         self.status_reporter = StatusReporter(config.verbose)
+        self.error_logger = ErrorLogger()
 
         # Initialize processors
         self.audio_processor = AudioProcessor(config)
@@ -87,6 +89,9 @@ class VideoTranscriptionPipeline:
 
         # Track processed items
         self.processed_stems: Set[str] = set()
+
+        # Track error types for summary
+        self.error_summary: Dict[str, int] = {}
 
         # Progress tracking
         self.progress_tracker = ProgressTracker()
@@ -128,6 +133,9 @@ class VideoTranscriptionPipeline:
             if not directory.exists():
                 raise FileNotFoundError(f"Directory not found: {directory}")
 
+            # Clear previous error log for fresh start
+            self.error_logger.clear_errors()
+
             self.status_reporter.info(f"Starting directory processing: {directory}")
 
             file_groups = self.file_discovery.group_files_by_stem(directory)
@@ -151,7 +159,7 @@ class VideoTranscriptionPipeline:
                 os._exit(130)
 
             total_processed = media_count + image_count + loose_count
-            total_errors = (len(file_groups) - media_count) + (len(file_groups) - image_count) + loose_count
+            total_errors = sum(self.error_summary.values())
 
             message = f"Processed {total_processed} items successfully"
             if total_errors > 0:
@@ -163,7 +171,8 @@ class VideoTranscriptionPipeline:
                 metadata={
                     "directory": str(directory),
                     "groups_processed": total_processed,
-                    "errors": total_errors
+                    "errors": total_errors,
+                    "error_summary": self.error_summary
                 }
             )
 
@@ -190,10 +199,16 @@ class VideoTranscriptionPipeline:
                         stem = source_path.stem
                         self.processed_stems.add(stem)
                     else:
-                        self.status_reporter.error(f"Failed to process {source_path.name}: {result.message}")
+                        error_msg = f"Failed to process {source_path.name}: {result.message}"
+                        self.status_reporter.error(error_msg)
+                        self.error_logger.log_error(f"{start_type}_processing", result.message, context=str(source_path))
+                        self.error_summary[f"{start_type}_processing"] = self.error_summary.get(f"{start_type}_processing", 0) + 1
 
                 except Exception as e:
-                    self.status_reporter.error(f"Error processing {source_path.name}: {e}")
+                    error_msg = f"Error processing {source_path.name}: {e}"
+                    self.status_reporter.error(error_msg)
+                    self.error_logger.log_error(f"{start_type}_error", str(e), context=str(source_path))
+                    self.error_summary[f"{start_type}_error"] = self.error_summary.get(f"{start_type}_error", 0) + 1
 
         return processed_count
 
@@ -223,7 +238,10 @@ class VideoTranscriptionPipeline:
                     result = self.image_processor.process(image_files, transcript_file)
 
                     if not result.success:
-                        self.status_reporter.error(f"Failed to process images for {stem}: {result.message}")
+                        error_msg = f"Failed to process images for {stem}: {result.message}"
+                        self.status_reporter.error(error_msg)
+                        self.error_logger.log_error("image_processing", result.message, context=stem)
+                        self.error_summary["image_processing"] = self.error_summary.get("image_processing", 0) + 1
                         continue
 
                 # Process transcript to study material
@@ -233,10 +251,16 @@ class VideoTranscriptionPipeline:
                     processed_count += 1
                     self.processed_stems.add(stem)
                 else:
-                    self.status_reporter.error(f"Failed to process study material for {stem}: {result.message}")
+                    error_msg = f"Failed to process study material for {stem}: {result.message}"
+                    self.status_reporter.error(error_msg)
+                    self.error_logger.log_error("study_generation", result.message, context=stem)
+                    self.error_summary["study_generation"] = self.error_summary.get("study_generation", 0) + 1
 
             except Exception as e:
-                self.status_reporter.error(f"Error processing images for {stem}: {e}")
+                error_msg = f"Error processing images for {stem}: {e}"
+                self.status_reporter.error(error_msg)
+                self.error_logger.log_error("image_error", str(e), context=stem)
+                self.error_summary["image_error"] = self.error_summary.get("image_error", 0) + 1
 
         return processed_count
 
@@ -273,7 +297,10 @@ class VideoTranscriptionPipeline:
                     result = self.image_processor.process(images, transcript_file)
 
                     if not result.success:
-                        self.status_reporter.error(f"Failed to process loose images in {folder_name}: {result.message}")
+                        error_msg = f"Failed to process loose images in {folder_name}: {result.message}"
+                        self.status_reporter.error(error_msg)
+                        self.error_logger.log_error("loose_image_processing", result.message, context=folder_name)
+                        self.error_summary["loose_image_processing"] = self.error_summary.get("loose_image_processing", 0) + 1
                         continue
 
                 # Process transcript to study material
@@ -282,10 +309,16 @@ class VideoTranscriptionPipeline:
                 if result.success:
                     processed_count += 1
                 else:
-                    self.status_reporter.error(f"Failed to process study material for loose images in {folder_name}: {result.message}")
+                    error_msg = f"Failed to process study material for loose images in {folder_name}: {result.message}"
+                    self.status_reporter.error(error_msg)
+                    self.error_logger.log_error("study_generation", result.message, context=f"loose images in {folder_name}")
+                    self.error_summary["study_generation"] = self.error_summary.get("study_generation", 0) + 1
 
             except Exception as e:
-                self.status_reporter.error(f"Error processing loose images in {folder_name}: {e}")
+                error_msg = f"Error processing loose images in {folder_name}: {e}"
+                self.status_reporter.error(error_msg)
+                self.error_logger.log_error("loose_image_error", str(e), context=folder_name)
+                self.error_summary["loose_image_error"] = self.error_summary.get("loose_image_error", 0) + 1
 
         return processed_count
 

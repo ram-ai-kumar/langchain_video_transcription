@@ -18,6 +18,8 @@ from src.core.config import PipelineConfig
 from src.core.exceptions import VideoTranscriptionError
 from src.core.pipeline import VideoTranscriptionPipeline, setup_logging
 from src.utils.ui_utils import ColorFormatter, StatusReporter
+from src.utils.error_logger import ErrorLogger
+from src.utils.error_summarizer import ErrorSummarizer
 
 
 class VideoTranscriptionCLI:
@@ -347,14 +349,36 @@ Examples:
             else:
                 print(ColorFormatter.error(f"\nProcessing completed with errors."))
                 print(f"Message: {result.message}")
-                sys.exit(1)
 
-        except KeyboardInterrupt:
-            # Handled by signal handler
-            pass
-        except VideoTranscriptionError as e:
-            print(ColorFormatter.error(f"Processing failed: {e}"))
-            sys.exit(1)
+                # Display error summary if available
+                if result.metadata and "error_summary" in result.metadata:
+                    error_summary = result.metadata["error_summary"]
+                    if error_summary:
+                        print(ColorFormatter.warning("\nError summary:"))
+                        for error_type, count in error_summary.items():
+                            # Format error type for display (replace underscores with spaces, capitalize)
+                            display_name = error_type.replace("_", " ").capitalize()
+                            print(f"  - {display_name}: {count}")
+
+                # Generate AI-powered error summary
+                print(ColorFormatter.info("\nAnalysing errors..."))
+                try:
+                    error_logger = ErrorLogger()
+                    summarizer = ErrorSummarizer(config, error_logger)
+                    ai_summary = summarizer.summarize_errors()
+
+                    if ai_summary:
+                        print(ColorFormatter.warning("\nAI Error Analysis:"))
+                        print(ai_summary)
+                        print(ColorFormatter.info(f"\nDetailed error log: {error_logger.error_log_path}"))
+                        print(ColorFormatter.info(f"AI summary saved to: {error_logger.summary_path}"))
+                    else:
+                        print(ColorFormatter.warning("No errors to analyze."))
+                except Exception as e:
+                    print(ColorFormatter.error(f"Failed to generate AI error summary: {e}"))
+                    print(ColorFormatter.info(f"Error log available at: ~/.cache/video_transcription/errors.txt"))
+
+                sys.exit(1)
         except Exception as e:
             self.logger.exception("Unexpected error: %s", e)
             print(ColorFormatter.error(f"Unexpected error: {e}"))

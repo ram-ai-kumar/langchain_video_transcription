@@ -91,15 +91,11 @@ python main.py /path/to/media --whisper-model large
 
 ### CLI Flags
 
-| Flag                 | Description                                   | Default     |
-| -------------------- | --------------------------------------------- | ----------- |
-| `--device`           | Compute device (`auto`, `cpu`, `cuda`, `mps`) | `auto`      |
-| `--whisper-model`    | Whisper model size                            | `medium`    |
-| `--batch-size`       | Tasks per processing batch                    | `4`         |
-| `--max-workers`      | Worker thread ceiling                         | auto-detect |
-| `--no-optimizations` | Disable all performance optimizations         | off         |
-| `--no-batch`         | Disable batch processing                      | off         |
-| `--verbose`          | Emit detailed performance and progress logs   | off         |
+| Flag              | Description                                   | Default  |
+| ----------------- | --------------------------------------------- | -------- |
+| `--device`        | Compute device (`auto`, `cpu`, `cuda`, `mps`) | `auto`   |
+| `--whisper-model` | Whisper model size                            | `medium` |
+| `--verbose`       | Emit detailed performance and progress logs   | off      |
 
 ### Config File (`config.json`)
 
@@ -107,10 +103,7 @@ python main.py /path/to/media --whisper-model large
 {
   "enable_performance_optimizations": true,
   "device": "auto",
-  "whisper_model": "medium",
-  "use_batch_processing": true,
-  "batch_size": 4,
-  "max_workers": null
+  "whisper_model": "medium"
 }
 ```
 
@@ -149,7 +142,7 @@ print(rec["optimal_workers"])
 Reduce pressure on GPU VRAM:
 
 ```bash
-python main.py /path/to/media --batch-size 2 --whisper-model small
+python main.py /path/to/media --whisper-model small
 ```
 
 ### MPS unavailable
@@ -165,13 +158,13 @@ python -c "import torch; print(torch.backends.mps.is_available())"
 
 1. Confirm the active device with `--verbose` — CPU fallback may be in effect.
 2. Check available RAM against the model size table above.
-3. For large batches, ensure `--no-batch` is not set accidentally.
+3. For large directories, the sequential processing ensures predictable resource usage.
 
 ---
 
 ## Operational Guidance for Enterprise Deployments
 
-- **Shared servers**: Keep `PIPELINE_CONCURRENCY = 2` to avoid monopolising GPU VRAM or LLM inference slots alongside other tenants.
-- **Dedicated GPU nodes**: Raise `PIPELINE_CONCURRENCY` in `src/core/pipeline.py` after profiling; `4` is a safe upper bound for a single A100/H100 with `medium` model.
+- **Shared servers**: Sequential processing prevents monopolising GPU VRAM or LLM inference slots alongside other tenants.
+- **Dedicated GPU nodes**: The pipeline uses sequential processing to ensure predictable resource usage on dedicated GPU nodes.
 - **Air-gapped environments**: All models (Whisper, Ollama) are cached locally after first download — the pipeline runs fully offline thereafter. No data leaves the host.
 - **Regulated content**: Use `--device cpu` to avoid MPS/CUDA kernel logs appearing in audit trails. Combine with `--whisper-model large` for maximum fidelity on compliance recordings.

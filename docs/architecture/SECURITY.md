@@ -41,7 +41,7 @@ All external inputs — CLI arguments, config files, media payloads — are vali
 - **Memory Limits**: Configurable caps on memory usage during heavy media processing.
 - **Lazy Model Loading**: Whisper and Ollama are loaded into VRAM only when their specific pipeline stage runs, then released. This prevents OOM failures and lowers minimum hardware requirements.
 - **Zero-Footprint Validation**: LLM availability is checked via a lightweight HTTP ping to `/api/tags` — model weights are never loaded during dependency checks.
-- **Sliding Window Scheduler**: At most 4 tasks are loaded (2 running + 2 queued) at any time, keeping I/O and memory pressure bounded even on directories with hundreds of files.
+- **Sequential Processing**: Files are processed one-by-one in deterministic order, keeping I/O and memory pressure bounded even on directories with hundreds of files.
 - **Thread-Safe State**: All shared counters, sets, and progress state are protected by `threading.Lock`.
 - **Automatic Cleanup**: Temporary files (extracted audio, intermediate artifacts) are cleaned up on both success and failure paths.
 
@@ -79,52 +79,56 @@ All external inputs — CLI arguments, config files, media payloads — are vali
 
 ### PCI DSS (4 of 12 Requirements)
 
-| Requirement | Control |
-| ----------- | ------- |
-| 6.5.1 Injection | Command injection prevention |
-| 6.5.2 Broken Authentication | Path traversal prevention |
-| 6.5.7 Improper Error Handling | Secure error reporting |
-| 6.5.10 Sensitive Data Exposure | Logging security |
+| Requirement                    | Control                      |
+| ------------------------------ | ---------------------------- |
+| 6.5.1 Injection                | Command injection prevention |
+| 6.5.2 Broken Authentication    | Path traversal prevention    |
+| 6.5.7 Improper Error Handling  | Secure error reporting       |
+| 6.5.10 Sensitive Data Exposure | Logging security             |
 
 ### CIS Controls (4 of 18)
 
-| Control | Implementation |
-| ------- | -------------- |
-| CIS 8: Malware Defense | File type validation and rejection |
-| CIS 13: Data Protection | Secure logging and data handling |
-| CIS 18: Application Security | Input validation and sanitization |
-| CIS 20: Incident Response | Error handling and recovery |
+| Control                      | Implementation                     |
+| ---------------------------- | ---------------------------------- |
+| CIS 8: Malware Defense       | File type validation and rejection |
+| CIS 13: Data Protection      | Secure logging and data handling   |
+| CIS 18: Application Security | Input validation and sanitization  |
+| CIS 20: Incident Response    | Error handling and recovery        |
 
 ### OWASP Top 10 (5 of 10 Categories)
 
-| Category | Control |
-| -------- | ------- |
-| A01: Broken Access Control | File permission and access validation |
-| A03: Injection | Command injection prevention |
-| A05: Security Misconfiguration | Configuration validation |
-| A06: Vulnerable Components | Dependency security checks |
-| A07: Authentication Failures | Input validation |
+| Category                       | Control                               |
+| ------------------------------ | ------------------------------------- |
+| A01: Broken Access Control     | File permission and access validation |
+| A03: Injection                 | Command injection prevention          |
+| A05: Security Misconfiguration | Configuration validation              |
+| A06: Vulnerable Components     | Dependency security checks            |
+| A07: Authentication Failures   | Input validation                      |
 
 ---
 
 ## Institutional & Deployment Features
 
 **On-Premises / Air-Gapped:**
+
 - Full functionality without network access after initial model download
 - Docker container encapsulates all dependencies — zero host footprint
 - Supports Kubernetes, Docker Swarm, and data-center deployment
 
 **Audit Trail:**
+
 - All operations logged with structured output and timestamps
 - Security events (validation failures, errors) are logged separately
 - Immutable log structure supports audit and forensic review
 
 **Data Protection:**
+
 - AES-256 at rest and TLS 1.3 in transit supported at the infrastructure layer
 - Role-based access control via host environment controls
 - Configurable data retention policies
 
 **Government Readiness:**
+
 - FISMA / FedRAMP alignment via air-gapped operation and structured audit logs
 - NIST 800-53 control coverage via ZTA implementation
 
@@ -146,10 +150,10 @@ For full test coverage details, see `tests/docs/SECURITY_TESTING_DOCUMENTATION.m
 
 ## Compliance Scorecard
 
-| Standard | Coverage | Notes |
-| -------- | -------- | ----- |
-| OWASP Top 10 | 5 / 10 | A01, A03, A05, A06, A07 |
-| CIS Controls | 4 / 18 | CIS 8, 13, 18, 20 |
-| PCI DSS | 4 / 12 | Requirements 6.5.x |
-| OWASP LLM Top 10 | See [OWASP_LLM_TOP_10.md](./OWASP_LLM_TOP_10.md) | AI-specific threat vectors |
-| Zero Trust Architecture | Full | All five ZTA pillars implemented |
+| Standard                | Coverage                                         | Notes                            |
+| ----------------------- | ------------------------------------------------ | -------------------------------- |
+| OWASP Top 10            | 5 / 10                                           | A01, A03, A05, A06, A07          |
+| CIS Controls            | 4 / 18                                           | CIS 8, 13, 18, 20                |
+| PCI DSS                 | 4 / 12                                           | Requirements 6.5.x               |
+| OWASP LLM Top 10        | See [OWASP_LLM_TOP_10.md](./OWASP_LLM_TOP_10.md) | AI-specific threat vectors       |
+| Zero Trust Architecture | Full                                             | All five ZTA pillars implemented |

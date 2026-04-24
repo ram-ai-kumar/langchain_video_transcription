@@ -10,46 +10,46 @@ For a high-level business or compliance overview, see the [Main README](../READM
 
 System design, security posture, and compliance reference:
 
-| Document | Contents |
-| -------- | -------- |
-| [ARCHITECTURE.md](./architecture/ARCHITECTURE.md) | Layered architecture, component design, patterns, technology stack |
-| [PROCESSING_ARCHITECTURE.md](./architecture/PROCESSING_ARCHITECTURE.md) | Three-pass processing pipeline, sliding window scheduler |
-| [ENTERPRISE_SCALABILITY.md](./architecture/ENTERPRISE_SCALABILITY.md) | Scalability mechanisms, lazy-loading, hardware sizing guidance |
-| [SECURITY.md](./architecture/SECURITY.md) | Zero Trust Architecture, input validation, GRC mappings (SOC2 / ISO27001 / NIST / PCI DSS / CIS / OWASP) |
-| [OWASP_LLM_TOP_10.md](./architecture/OWASP_LLM_TOP_10.md) | AI-specific threat mitigations mapped to OWASP LLM Top 10 |
+| Document                                                                | Contents                                                                                                 |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| [ARCHITECTURE.md](./architecture/ARCHITECTURE.md)                       | Layered architecture, component design, patterns, technology stack                                       |
+| [PROCESSING_ARCHITECTURE.md](./architecture/PROCESSING_ARCHITECTURE.md) | Three-pass processing pipeline, sequential processing                                                    |
+| [ENTERPRISE_SCALABILITY.md](./architecture/ENTERPRISE_SCALABILITY.md)   | Scalability mechanisms, lazy-loading, hardware sizing guidance                                           |
+| [SECURITY.md](./architecture/SECURITY.md)                               | Zero Trust Architecture, input validation, GRC mappings (SOC2 / ISO27001 / NIST / PCI DSS / CIS / OWASP) |
+| [OWASP_LLM_TOP_10.md](./architecture/OWASP_LLM_TOP_10.md)               | AI-specific threat mitigations mapped to OWASP LLM Top 10                                                |
 
 ## Features (`features/`)
 
-| Document | Contents |
-| -------- | -------- |
+| Document                              | Contents                                                                              |
+| ------------------------------------- | ------------------------------------------------------------------------------------- |
 | [FEATURES.md](./features/FEATURES.md) | Full feature list including Unicode support, error recovery, mixed media intelligence |
 
 ## Setup (`setup/`)
 
-| Document | Contents |
-| -------- | -------- |
-| [SETUP.md](./setup/SETUP.md) | Installation: virtualenv and Docker options |
+| Document                                     | Contents                                        |
+| -------------------------------------------- | ----------------------------------------------- |
+| [SETUP.md](./setup/SETUP.md)                 | Installation: virtualenv and Docker options     |
 | [PREREQUISITES.md](./setup/PREREQUISITES.md) | System requirements and dependency installation |
-| [MIGRATION.md](./setup/MIGRATION.md) | Upgrade guide for existing deployments |
+| [MIGRATION.md](./setup/MIGRATION.md)         | Upgrade guide for existing deployments          |
 
 ## Usage (`usage/`)
 
-| Document | Contents |
-| -------- | -------- |
+| Document                     | Contents                                                                                             |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
 | [USAGE.md](./usage/USAGE.md) | Supported media types, running the pipeline, CLI options, config file, customization, example output |
 
 ## Guides (`guides/`)
 
-| Document | Contents |
-| -------- | -------- |
-| [PERFORMANCE_OPTIMIZATION.md](./guides/PERFORMANCE_OPTIMIZATION.md) | Sliding window scheduler, device selection (CUDA/MPS/CPU), Whisper model selection, enterprise tuning |
-| [ENGINEERING_EXCELLENCE.md](./guides/ENGINEERING_EXCELLENCE.md) | Code quality standards, testing practices, development workflow |
+| Document                                                            | Contents                                                                    |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [PERFORMANCE_OPTIMIZATION.md](./guides/PERFORMANCE_OPTIMIZATION.md) | Device selection (CUDA/MPS/CPU), Whisper model selection, enterprise tuning |
+| [ENGINEERING_EXCELLENCE.md](./guides/ENGINEERING_EXCELLENCE.md)     | Code quality standards, testing practices, development workflow             |
 
 ## Reference (`reference/`)
 
-| Document | Contents |
-| -------- | -------- |
-| [TODO.md](./reference/TODO.md) | Planned improvements and open tasks |
+| Document                             | Contents                                                |
+| ------------------------------------ | ------------------------------------------------------- |
+| [TODO.md](./reference/TODO.md)       | Planned improvements and open tasks                     |
 | [ROADMAP.md](./reference/ROADMAP.md) | Long-term architecture evolution: SOA and DDD proposals |
 
 ---
@@ -71,7 +71,7 @@ System design, security posture, and compliance reference:
 
 ### Performance Tuning
 
-- [PERFORMANCE_OPTIMIZATION.md](./guides/PERFORMANCE_OPTIMIZATION.md) — scheduler constants, GPU setup, model selection
+- [PERFORMANCE_OPTIMIZATION.md](./guides/PERFORMANCE_OPTIMIZATION.md) — GPU setup, model selection
 
 ---
 
