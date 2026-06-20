@@ -355,26 +355,6 @@ class VideoTranscriptionPipeline:
                 legacy_path.rename(sanitized_path)
                 self.logger.info("Renamed legacy file: %s -> %s", legacy_path.name, sanitized_path.name)
 
-    def _migrate_legacy_study_files(self, source_path: Path, paths: dict) -> None:
-        """Rename legacy study files that have _study.md suffix to .md.
-
-        This handles directories that were processed by an older version of the pipeline
-        that used _study.md suffix for study material files.
-        """
-        dir_path = source_path.parent
-        base = re.sub(r'\s', ' ', source_path.stem)
-
-        legacy_study_file = dir_path / f"{base}_study.md"
-        new_study_file = paths.get("study_file")
-
-        if (
-            new_study_file
-            and legacy_study_file != new_study_file
-            and legacy_study_file.exists()
-            and not new_study_file.exists()
-        ):
-            legacy_study_file.rename(new_study_file)
-            self.logger.info("Renamed legacy study file: %s -> %s", legacy_study_file.name, new_study_file.name)
 
     def _get_processing_stages(self, start_type: str) -> list[str]:
         """Get the list of processing stages for a given start type."""
@@ -409,9 +389,6 @@ class VideoTranscriptionPipeline:
             # Rename any legacy files that have Unicode whitespace in their stems so that
             # the existence-checks below see them correctly and skip regeneration.
             self._migrate_legacy_unsanitized_files(source_path, paths)
-
-            # Rename any legacy study files that have _study.md suffix to .md
-            self._migrate_legacy_study_files(source_path, paths)
 
             # Start progress tracking
             stages = self._get_processing_stages(start_type)

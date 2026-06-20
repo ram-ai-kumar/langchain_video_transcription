@@ -29,7 +29,7 @@
 - **Interactive CLI**: Prompts for desired output target when not specified, with clear menu options.
 - **Progress Tracking**: Real-time in-place progress display showing current processing stage for each file.
 - **AI-Powered Error Analysis**: Automatic error summarization using LLM to diagnose and explain processing failures.
-- **Legacy File Migration**: Automatically migrates old unsanitized filenames and `_study.md` suffix files to current format.
+- **Legacy File Migration**: Automatically migrates old unsanitized filenames to current format.
 - **Comprehensive CLI Options**: Full command-line interface with configuration files, dependency checking, and validation modes.
 - **Robust Error Handling**: Graceful fallbacks, detailed error logging, and pipeline continuation despite individual failures.
 

@@ -85,7 +85,6 @@ The heart of the system that orchestrates the entire processing workflow:
   - `_process_image_groups()`: Handles Pass 2 processing
   - `_process_loose_images()`: Handles Pass 3 processing
   - `_migrate_legacy_unsanitized_files()`: Migrates old unsanitized filenames
-  - `_migrate_legacy_study_files()`: Migrates old _study.md suffix files
 - **Idempotency**: Checks for existing artifacts and skips regeneration
 
 ### 4. Processors (`src/processors/`)
@@ -365,7 +364,7 @@ PDF Generation (optional)
     ↓
 Output Files
     ├─ Transcript: {name}.txt or {name}_images.txt
-    ├─ Study Material: {name}_study.md
+    ├─ Study Material: {name}.md
     └─ PDF: {name}.pdf (if enabled)
 ```
 

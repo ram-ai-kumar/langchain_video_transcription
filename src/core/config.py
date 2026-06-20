@@ -12,7 +12,7 @@ class PipelineConfig:
     """Configuration object for pipeline settings."""
 
     # Model settings
-    llm_model: str = "qwen3.5:latest"
+    llm_model: str = "gemma4:latest"
     whisper_model: str = "medium"
 
     # Output settings

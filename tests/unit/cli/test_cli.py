@@ -34,7 +34,7 @@ class TestVideoTranscriptionCLI:
         assert args.directory == Path("/tmp/test")
         assert args.verbose is False
         assert args.whisper_model == "medium"
-        assert args.llm_model == "qwen3.5:latest"
+        assert args.llm_model == "gemma4:latest"
 
     def test_parse_config_file_success(self, temp_dir):
         """Test successful config file parsing."""

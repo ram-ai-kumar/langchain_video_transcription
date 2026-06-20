@@ -151,7 +151,7 @@ Create a JSON configuration file for complex or repeatable setups:
 ```json
 {
   "whisper_model": "large",
-  "llm_model": "qwen3.5:latest",
+  "llm_model": "gemma4:latest",
   "generate_pdf": true,
   "verbose": true,
   "output_dir": "/custom/output",

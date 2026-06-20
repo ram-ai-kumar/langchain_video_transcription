@@ -37,7 +37,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
   class PipelineConfig(BaseModel):
       whisper_model: str = "medium"
-      llm_model: str = "qwen3.5:latest"
+      llm_model: str = "gemma4:latest"
 
       @field_validator("whisper_model")
       @classmethod

@@ -59,7 +59,7 @@ class TestProgressDisplayIntegration:
         pipeline.file_discovery.get_output_paths.return_value = {
             'audio_file': tmp_path / "test_video.mp3",
             'transcript_file': tmp_path / "test_video.txt",
-            'study_file': tmp_path / "test_video_study.md",
+            'study_file': tmp_path / "test_video.md",
             'pdf_file': tmp_path / "test_video.pdf"
         }
 

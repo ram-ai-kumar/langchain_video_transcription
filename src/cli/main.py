@@ -92,8 +92,8 @@ Examples:
 
         parser.add_argument(
             "--llm-model",
-            default="qwen3.5:latest",
-            help="LLM model for content generation (default: qwen3.5:latest)"
+            default="gemma4:latest",
+            help="LLM model for content generation (default: gemma4:latest)"
         )
 
         # UI options
@@ -165,7 +165,7 @@ Examples:
             "target": target,
             "generate_pdf": target == "pdf" and not getattr(args, "no_pdf", False),
             "whisper_model": getattr(args, "whisper_model", "medium"),
-            "llm_model": getattr(args, "llm_model", "qwen3.5:latest"),
+            "llm_model": getattr(args, "llm_model", "gemma4:latest"),
             "verbose": getattr(args, "verbose", False),
             # Performance settings
             "device": getattr(args, "device", None),
