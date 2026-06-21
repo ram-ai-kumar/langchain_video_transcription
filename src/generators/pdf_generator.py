@@ -230,6 +230,8 @@ class PDFGenerator:
                     "--variable", "fontsize=12pt",
                     "--variable", "mainfont=Arial",
                     "--variable", "sansfont=Arial",
+                    "--variable", "mathfont=Latin Modern Math",
+                    "--variable", "mainfontoptions={Ligatures=TeX}",
                     "--toc",
                     "--toc-depth=3",
                     "--number-sections",
@@ -278,6 +280,8 @@ class PDFGenerator:
                         "--variable", "fontsize=12pt",
                         "--variable", "mainfont=Arial",
                         "--variable", "sansfont=Arial",
+                        "--variable", "mathfont=Latin Modern Math",
+                        "--variable", "mainfontoptions={Ligatures=TeX}",
                         "--wrap=none",
                         "--standalone",
                         "--fail-if-warnings=false",
@@ -304,6 +308,8 @@ class PDFGenerator:
                             "--variable", "fontsize=12pt",
                             "--variable", "mainfont=Arial",
                             "--variable", "sansfont=Arial",
+                            "--variable", "mathfont=Latin Modern Math",
+                            "--variable", "mainfontoptions={Ligatures=TeX}",
                             "--wrap=none",
                             "--standalone",
                             "--fail-if-warnings=false",
@@ -329,6 +335,8 @@ class PDFGenerator:
                                 "--variable", "fontsize=12pt",
                                 "--variable", "mainfont=Arial",
                                 "--variable", "sansfont=Arial",
+                                "--variable", "mathfont=Latin Modern Math",
+                                "--variable", "mainfontoptions={Ligatures=TeX}",
                                 "--wrap=none",
                                 "--standalone",
                                 "--fail-if-warnings=false",
@@ -374,6 +382,8 @@ class PDFGenerator:
                     "--variable", "fontsize=12pt",
                     "--variable", "mainfont=Arial",
                     "--variable", "sansfont=Arial",
+                    "--variable", "mathfont=Latin Modern Math",
+                    "--variable", "mainfontoptions={Ligatures=TeX}",
                     "--toc",
                     "--toc-depth=3",
                     "--number-sections",
@@ -467,6 +477,8 @@ class PDFGenerator:
                             "--variable", "fontsize=12pt",
                             "--variable", "mainfont=Arial",
                             "--variable", "sansfont=Arial",
+                            "--variable", "mathfont=Latin Modern Math",
+                            "--variable", "mainfontoptions={Ligatures=TeX}",
                             "--fail-if-warnings=false",
                         ]
                         capture_command_output(cmd)
@@ -492,6 +504,8 @@ class PDFGenerator:
                                 "--variable", "fontsize=12pt",
                                 "--variable", "mainfont=Arial",
                                 "--variable", "sansfont=Arial",
+                                "--variable", "mathfont=Latin Modern Math",
+                                "--variable", "mainfontoptions={Ligatures=TeX}",
                                 "--fail-if-warnings=false",
                             ]
                             capture_command_output(cmd)
@@ -516,6 +530,8 @@ class PDFGenerator:
                                     "--variable", "fontsize=12pt",
                                     "--variable", "mainfont=Arial",
                                     "--variable", "sansfont=Arial",
+                                    "--variable", "mathfont=Latin Modern Math",
+                                    "--variable", "mainfontoptions={Ligatures=TeX}",
                                     "--fail-if-warnings=false",
                                 ]
                                 capture_command_output(cmd)
