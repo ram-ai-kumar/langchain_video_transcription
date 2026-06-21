@@ -84,11 +84,9 @@ class LLMProcessor(BaseProcessor):
                 try:
                     study_material = chain.invoke({"transcript": transcript_text})
                     
-                    # Log response details for debugging
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.info(f"Attempt {attempt + 1}/{max_retries}: Response length = {len(study_material) if study_material else 0}")
                     if not study_material or not study_material.strip():
+                        import logging
+                        logger = logging.getLogger(__name__)
                         logger.warning(f"Attempt {attempt + 1}: Empty response received")
                     
                     # Validate LLM response is not empty
@@ -98,7 +96,6 @@ class LLMProcessor(BaseProcessor):
                     if attempt < max_retries - 1:
                         # Wait before retry with exponential backoff
                         wait_time = 2 ** attempt
-                        logger.info(f"Retrying in {wait_time} seconds...")
                         time.sleep(wait_time)
                     else:
                         return ProcessResult(
@@ -111,7 +108,6 @@ class LLMProcessor(BaseProcessor):
                     logger.error(f"Attempt {attempt + 1} failed with exception: {e}")
                     if attempt < max_retries - 1:
                         wait_time = 2 ** attempt
-                        logger.info(f"Retrying in {wait_time} seconds...")
                         time.sleep(wait_time)
                     else:
                         return ProcessResult(
