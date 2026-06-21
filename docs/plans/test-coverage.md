@@ -57,15 +57,41 @@ This plan outlines a strategy to achieve comprehensive test coverage across smok
 
 **Execute in this order from top to bottom:**
 
-### Priority 1: Setup Coverage Infrastructure (Day 1)
+### Priority 1: Setup Coverage Infrastructure (Day 1) ✅ **COMPLETED**
 
 **Why:** Foundation for all coverage work - enables measurement and tracking
 
-- Install coverage tools: `pip install pytest-cov coverage[toml]`
-- Update `pyproject.toml` with coverage configuration
-- Configure branch coverage and exclusion rules
-- Set initial coverage threshold to 60% (current config)
-- Generate baseline coverage report
+**Completed:**
+
+- ✅ Install coverage tools: `pip install pytest-cov coverage[toml]`
+- ✅ Update `pyproject.toml` with coverage configuration
+- ✅ Configure branch coverage and exclusion rules
+- ✅ Set initial coverage threshold to 60% (current config)
+- ✅ Generate baseline coverage report
+
+**Baseline Coverage Results:**
+
+- **Overall coverage:** 41.52% (below 60% threshold)
+- **Total statements:** 2,250
+- **Covered statements:** 1,037
+- **Missed statements:** 1,213
+- **Branch coverage:** 82 branches covered (partial coverage)
+- **HTML report:** Generated in `htmlcov/` directory
+
+**Key Module Coverage:**
+
+- `src/utils/error_logger.py`: 100% ✅
+- `src/utils/progress_tracker.py`: 87.21%
+- `src/utils/ui_utils.py`: 83.64%
+- `src/core/config.py`: 85.71%
+- `src/core/exceptions.py`: 76.19%
+- `src/processors/text_processor.py`: 77.36%
+- `src/generators/study_generator.py`: 65.96%
+- `src/core/pipeline.py`: 45.37%
+- `src/processors/audio_processor.py`: 33.33%
+- `src/generators/pdf_generator.py`: 13.49%
+
+**Note:** 8 existing test failures (not related to new smoke tests) need to be addressed to improve coverage.
 
 ### Priority 2: Regression Tests (Day 2-3)
 

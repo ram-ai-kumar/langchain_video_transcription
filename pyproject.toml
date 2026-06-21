@@ -18,19 +18,29 @@ markers = [
     "zta: Zero Tolerance Architecture tests",
     "reliability: System reliability and resilience tests",
     "slow: Tests that take longer to run",
+    "progress: Tests for progress tracking and display",
+    "compliance: Compliance and security tests",
+    "exception: Exception handling tests",
+    "pipeline: Pipeline orchestration tests",
 ]
 
 [tool.coverage.run]
 source = ["src"]
 omit = ["*/tests/*", "*/test_*", "*/conftest.py"]
+branch = true
 
 [tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
     "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
 ]
 fail_under = 60
+precision = 2
+show_missing = true
+skip_covered = false
 
 [tool.ruff]
 line-length = 88
