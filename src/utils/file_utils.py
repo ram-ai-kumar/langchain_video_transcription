@@ -148,17 +148,38 @@ class FileManager:
 
     @staticmethod
     def safe_read_text(file_path: Path, encoding: str = "utf-8") -> str:
-        """Safely read text file with error handling."""
-        try:
-            return file_path.read_text(encoding=encoding)
-        except UnicodeDecodeError:
-            # Try with different encodings
-            for alt_encoding in ["latin-1", "cp1252"]:
-                try:
-                    return file_path.read_text(encoding=alt_encoding)
-                except UnicodeDecodeError:
-                    continue
-            raise
+        """Safely read text file with error handling.
+        
+        Tries multiple encodings in order of preference:
+        1. UTF-8 (default)
+        2. UTF-16 with BOM
+        3. UTF-16-LE
+        4. UTF-16-BE
+        5. Latin-1 (fallback for any byte sequence)
+        6. CP1252 (Windows Western European)
+        """
+        encodings_to_try = [
+            encoding,  # Default (usually utf-8)
+            "utf-8-sig",  # UTF-8 with BOM
+            "utf-16",  # UTF-16 with BOM detection
+            "utf-16-le",  # UTF-16 Little Endian
+            "utf-16-be",  # UTF-16 Big Endian
+            "latin-1",  # Fallback that never fails
+            "cp1252",  # Windows Western European
+        ]
+        
+        last_error = None
+        for enc in encodings_to_try:
+            try:
+                return file_path.read_text(encoding=enc)
+            except UnicodeDecodeError as e:
+                last_error = e
+                continue
+        
+        # If all encodings fail, raise the last error
+        raise last_error if last_error else UnicodeDecodeError(
+            "unknown", b"", 0, 0, "Failed to decode file with any supported encoding"
+        )
 
     @staticmethod
     def safe_write_text(file_path: Path, content: str, encoding: str = "utf-8") -> None:

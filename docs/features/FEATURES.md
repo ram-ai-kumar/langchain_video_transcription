@@ -17,7 +17,7 @@
   - In-depth coverage with best practices and pitfalls
   - Glossary of important terms
   - Practice questions (MCQ, short answer, and critical thinking)
-- **Externalized Study Prompt**: Define the textbook author persona, structure, and rules in `config/study_prompt.txt` for easy customization.
+- **Externalized Study Prompt**: Define the textbook author persona, structure, and rules in `config/study_prompt.md` for easy customization.
 - **Enhanced PDF Generation**: PDF generation using Tectonic (XeTeX-based, with native Unicode support) → Minimal fallback.
 - **Standard Footer**: Developer attribution and "AI-generated" content notice in PDF footers.
 - **Unicode Support**: Handles Greek letters, special characters, and international symbols in PDFs.

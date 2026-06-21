@@ -1,5 +1,6 @@
 """LLM processor for generating study materials using LangChain and Ollama."""
 
+import time
 from pathlib import Path
 
 from langchain_core.prompts import PromptTemplate
@@ -74,9 +75,49 @@ class LLMProcessor(BaseProcessor):
                     message=f"Transcript file is empty: {transcript_path.name}"
                 )
 
-            # Generate study material
+            # Generate study material with retry logic for empty responses
             chain = self._get_study_chain()
-            study_material = chain.invoke({"transcript": transcript_text})
+            max_retries = 3
+            study_material = None
+            
+            for attempt in range(max_retries):
+                try:
+                    study_material = chain.invoke({"transcript": transcript_text})
+                    
+                    # Log response details for debugging
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"Attempt {attempt + 1}/{max_retries}: Response length = {len(study_material) if study_material else 0}")
+                    if not study_material or not study_material.strip():
+                        logger.warning(f"Attempt {attempt + 1}: Empty response received")
+                    
+                    # Validate LLM response is not empty
+                    if study_material and study_material.strip():
+                        break
+                    
+                    if attempt < max_retries - 1:
+                        # Wait before retry with exponential backoff
+                        wait_time = 2 ** attempt
+                        logger.info(f"Retrying in {wait_time} seconds...")
+                        time.sleep(wait_time)
+                    else:
+                        return ProcessResult(
+                            success=False,
+                            message=f"LLM returned empty response after {max_retries} attempts for {transcript_path.name}. Model: {self.config.llm_model}"
+                        )
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Attempt {attempt + 1} failed with exception: {e}")
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** attempt
+                        logger.info(f"Retrying in {wait_time} seconds...")
+                        time.sleep(wait_time)
+                    else:
+                        return ProcessResult(
+                            success=False,
+                            message=f"LLM invocation failed after {max_retries} attempts for {transcript_path.name}. Error: {e}. Model: {self.config.llm_model}"
+                        )
 
             # Write study material to file
             with open(study_file_path, "w", encoding="utf-8") as f:

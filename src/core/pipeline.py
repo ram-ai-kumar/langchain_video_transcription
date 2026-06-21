@@ -127,6 +127,67 @@ class VideoTranscriptionPipeline:
                 raise VideoTranscriptionError(f"Failed to load Whisper model '{self.config.whisper_model}': {e}")
         return self.whisper_model
 
+    def process_path(self, input_path: Path) -> ProcessResult:
+        """Process a single file or directory."""
+        if input_path.is_file():
+            return self.process_single_file(input_path)
+        elif input_path.is_dir():
+            return self.process_directory(input_path)
+        else:
+            return ProcessResult(
+                success=False,
+                message=f"Path is neither a file nor a directory: {input_path}"
+            )
+
+    def process_single_file(self, file_path: Path) -> ProcessResult:
+        """Process a single media file."""
+        try:
+            if not file_path.exists():
+                raise FileNotFoundError(f"File not found: {file_path}")
+
+            # Clear previous error log for fresh start
+            self.error_logger.clear_errors()
+
+            self.status_reporter.info(f"Starting single file processing: {file_path}")
+
+            # Create a single-item file group
+            file_groups = {file_path.stem: [file_path]}
+
+            # Process the file
+            try:
+                media_count = self._process_media_groups(file_groups, file_path.parent)
+                image_count = self._process_image_groups(file_groups, file_path.parent)
+                loose_count = 0  # No loose images for single file
+            except KeyboardInterrupt:
+                print("\n\n🛑 Processing interrupted by user (Ctrl+C). Terminating...")
+                os._exit(130)
+
+            total_processed = media_count + image_count + loose_count
+            total_errors = sum(self.error_summary.values())
+
+            message = f"Processed {total_processed} items successfully"
+            if total_errors > 0:
+                message += f" with {total_errors} errors"
+
+            return ProcessResult(
+                success=total_errors == 0,
+                message=message,
+                metadata={
+                    "file": str(file_path),
+                    "items_processed": total_processed,
+                    "errors": total_errors,
+                    "error_summary": self.error_summary
+                }
+            )
+
+        except Exception as e:
+            self.logger.exception("Error processing single file: %s", e)
+            return ProcessResult(
+                success=False,
+                message=f"Failed to process file: {e}",
+                metadata={"file": str(file_path)}
+            )
+
     def process_directory(self, directory: Path) -> ProcessResult:
         """Process entire directory tree."""
         try:

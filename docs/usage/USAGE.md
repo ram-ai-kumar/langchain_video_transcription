@@ -163,9 +163,9 @@ Create a JSON configuration file for complex or repeatable setups:
 
 ## Customization
 
-### Study Prompt (`config/study_prompt.txt`)
+### Study Prompt (`config/study_prompt.md`)
 
-The AI's persona, output structure, and generation rules are defined in `config/study_prompt.txt`. Edit this file to:
+The AI's persona, output structure, and generation rules are defined in `config/study_prompt.md`. Edit this file to:
 
 - Change the tone of the generated textbook chapter.
 - Add or remove sections from the study material.

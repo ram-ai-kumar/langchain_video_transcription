@@ -12,7 +12,7 @@ class PipelineConfig:
     """Configuration object for pipeline settings."""
 
     # Model settings
-    llm_model: str = "qwen3.5:latest"
+    llm_model: str = "qwen2.5-coder:latest"
     whisper_model: str = "medium"
 
     # Output settings
@@ -46,7 +46,7 @@ class PipelineConfig:
     def __post_init__(self):
         """Initialize derived paths and validate configuration."""
         if self.prompt_file is None:
-            self.prompt_file = Path(__file__).parent.parent.parent / "config" / "study_prompt.txt"
+            self.prompt_file = Path(__file__).parent.parent.parent / "config" / "study_prompt.md"
 
         if self.header_file is None:
             self.header_file = Path(__file__).parent.parent.parent / "config" / "header.tex"

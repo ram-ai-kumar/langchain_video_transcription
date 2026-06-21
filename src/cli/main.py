@@ -58,9 +58,9 @@ Examples:
 
         # Positional arguments
         parser.add_argument(
-            "directory",
+            "input_path",
             type=Path,
-            help="Path to folder containing media files to process"
+            help="Path to media file or folder containing media files to process"
         )
 
         # Processing options
@@ -92,8 +92,8 @@ Examples:
 
         parser.add_argument(
             "--llm-model",
-            default="qwen3.5:latest",
-            help="LLM model for content generation (default: qwen3.5:latest)"
+            default="qwen2.5-coder:latest",
+            help="LLM model for content generation (default: qwen2.5-coder:latest)"
         )
 
         # UI options
@@ -165,7 +165,7 @@ Examples:
             "target": target,
             "generate_pdf": target == "pdf" and not getattr(args, "no_pdf", False),
             "whisper_model": getattr(args, "whisper_model", "medium"),
-            "llm_model": getattr(args, "llm_model", "qwen3.5:latest"),
+            "llm_model": getattr(args, "llm_model", "qwen2.5-coder:latest"),
             "verbose": getattr(args, "verbose", False),
             # Performance settings
             "device": getattr(args, "device", None),
@@ -240,14 +240,14 @@ Examples:
 
         return all_good
 
-    def validate_input_directory(self, directory: Path) -> bool:
-        """Validate input directory."""
-        if not directory.exists():
-            print(ColorFormatter.error(f"Directory not found: {directory}"))
+    def validate_input_path(self, input_path: Path) -> bool:
+        """Validate input path (file or directory)."""
+        if not input_path.exists():
+            print(ColorFormatter.error(f"Path not found: {input_path}"))
             return False
 
-        if not directory.is_dir():
-            print(ColorFormatter.error(f"Path is not a directory: {directory}"))
+        if not (input_path.is_file() or input_path.is_dir()):
+            print(ColorFormatter.error(f"Path is neither a file nor a directory: {input_path}"))
             return False
 
         return True
@@ -303,8 +303,8 @@ Examples:
             deps_ok = self.check_dependencies(config)
             sys.exit(0 if deps_ok else 1)
 
-        # Validate input directory
-        if not self.validate_input_directory(args.directory):
+        # Validate input path
+        if not self.validate_input_path(args.input_path):
             sys.exit(1)
 
         # Validate only mode
@@ -337,8 +337,8 @@ Examples:
             if config.target in ["markdown", "pdf"]:
                 print(ColorFormatter.info("AI is warming up... ready to crunch some knowledge."))
 
-            # Process directory
-            result = self.pipeline.process_directory(args.directory)
+            # Process directory or file
+            result = self.pipeline.process_path(args.input_path)
 
             if result.success:
                 print(ColorFormatter.success(f"\nProcessing completed successfully!"))

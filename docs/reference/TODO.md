@@ -204,7 +204,7 @@ This document describes **planned improvements** for the Video Transcription & S
 
 ### **11. Study Prompt Versioning**
 
-**Current State**: `config/study_prompt.txt` is a flat text file with no version metadata; impossible to tell which prompt version produced which study material
+**Current State**: `config/study_prompt.md` is a flat text file with no version metadata; impossible to tell which prompt version produced which study material
 
 **Required Actions**:
 

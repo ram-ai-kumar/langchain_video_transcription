@@ -354,7 +354,7 @@ Three-Pass Processing System:
         └─ Generate study material from transcript
     ↓
 Study Material Generation
-    ├─ Load prompt template from config/study_prompt.txt
+    ├─ Load prompt template from config/study_prompt.md
     ├─ Invoke LLM with transcript
     └─ Write study material markdown
     ↓
@@ -449,7 +449,7 @@ src/
 | Images → Text            | **Tesseract OCR**                    | Optical character recognition         |
 | Text → Summary           | **LangChain Core** + **Ollama LLM**  | Prompt orchestration & summarization  |
 | Summary → Study Material | **LangChain PromptTemplate**         | Rich, structured learning content     |
-| Study Prompt             | **config/study_prompt.txt**          | Externalized customization of output  |
+| Study Prompt             | **config/study_prompt.md**          | Externalized customization of output  |
 | Markdown → PDF           | **Pandoc** + **Tectonic**            | Professional document generation      |
 | CLI UX                   | **ProgressTracker + StatusReporter** | Real-time progress and status display |
 
