@@ -39,6 +39,8 @@ class PDFGenerator:
                         raise ValueError("Markdown file is empty")
                     # Sanitize Unicode whitespace to prevent pandoc errors
                     content = self._sanitize_unicode_whitespace(content)
+                    # Sanitize Greek characters to LaTeX math mode
+                    content = self._sanitize_greek_characters(content)
                     # Check if content has code blocks
                     has_code_blocks = '```' in content
                     # Sanitize code blocks to prevent LaTeX errors
@@ -172,6 +174,44 @@ class PDFGenerator:
         sanitized = re.sub(r'\s', ' ', content)
         return sanitized
 
+    def _sanitize_greek_characters(self, content: str) -> str:
+        """Sanitize Greek Unicode characters by wrapping in LaTeX math mode.
+
+        Converts standalone Greek characters (φ, θ, π, etc.) to LaTeX math mode
+        to prevent font rendering errors when fonts don't support them.
+        """
+        import re
+        
+        # Common Greek characters that cause LaTeX font errors
+        greek_to_latex = {
+            'φ': r'$\phi$',
+            'θ': r'$\theta$',
+            'π': r'$\pi$',
+            'α': r'$\alpha$',
+            'β': r'$\beta$',
+            'γ': r'$\gamma$',
+            'δ': r'$\delta$',
+            'ε': r'$\epsilon$',
+            'λ': r'$\lambda$',
+            'μ': r'$\mu$',
+            'σ': r'$\sigma$',
+            'τ': r'$\tau$',
+            'ω': r'$\omega$',
+            'Φ': r'$\Phi$',
+            'Θ': r'$\Theta$',
+            'Π': r'$\Pi$',
+            'Γ': r'$\Gamma$',
+            'Δ': r'$\Delta$',
+            'Σ': r'$\Sigma$',
+            'Ω': r'$\Omega$',
+        }
+        
+        # Replace each Greek character with its LaTeX equivalent
+        for greek_char, latex_equiv in greek_to_latex.items():
+            content = content.replace(greek_char, latex_equiv)
+        
+        return content
+
     def _generate_from_stdin(self, content: str, pdf_path: Path, engine: str) -> ProcessResult:
         """Generate PDF from content via stdin to avoid file system issues."""
         try:
@@ -188,6 +228,8 @@ class PDFGenerator:
                     "--from", "markdown+lists_without_preceding_blankline",
                     f"--pdf-engine={engine}",
                     "--variable", "fontsize=12pt",
+                    "--variable", "mainfont=Arial",
+                    "--variable", "sansfont=Arial",
                     "--toc",
                     "--toc-depth=3",
                     "--number-sections",
@@ -234,6 +276,8 @@ class PDFGenerator:
                         "--from", "markdown+lists_without_preceding_blankline",
                         "--pdf-engine=tectonic",
                         "--variable", "fontsize=12pt",
+                        "--variable", "mainfont=Arial",
+                        "--variable", "sansfont=Arial",
                         "--wrap=none",
                         "--standalone",
                         "--fail-if-warnings=false",
@@ -258,6 +302,8 @@ class PDFGenerator:
                             "--from", "markdown+lists_without_preceding_blankline",
                             "--pdf-engine=xelatex",
                             "--variable", "fontsize=12pt",
+                            "--variable", "mainfont=Arial",
+                            "--variable", "sansfont=Arial",
                             "--wrap=none",
                             "--standalone",
                             "--fail-if-warnings=false",
@@ -281,6 +327,8 @@ class PDFGenerator:
                                 "-o", str(temp_pdf),
                                 "--from", "gfm",
                                 "--variable", "fontsize=12pt",
+                                "--variable", "mainfont=Arial",
+                                "--variable", "sansfont=Arial",
                                 "--wrap=none",
                                 "--standalone",
                                 "--fail-if-warnings=false",
@@ -324,6 +372,8 @@ class PDFGenerator:
                     "--from", "markdown+lists_without_preceding_blankline",
                     f"--pdf-engine={engine}",
                     "--variable", "fontsize=12pt",
+                    "--variable", "mainfont=Arial",
+                    "--variable", "sansfont=Arial",
                     "--toc",
                     "--toc-depth=3",
                     "--number-sections",
@@ -415,6 +465,8 @@ class PDFGenerator:
                             "--from", "markdown+lists_without_preceding_blankline",
                             "--pdf-engine=xelatex",
                             "--variable", "fontsize=12pt",
+                            "--variable", "mainfont=Arial",
+                            "--variable", "sansfont=Arial",
                             "--fail-if-warnings=false",
                         ]
                         capture_command_output(cmd)
@@ -438,6 +490,8 @@ class PDFGenerator:
                                 "--from", "markdown+lists_without_preceding_blankline",
                                 "--pdf-engine=tectonic",
                                 "--variable", "fontsize=12pt",
+                                "--variable", "mainfont=Arial",
+                                "--variable", "sansfont=Arial",
                                 "--fail-if-warnings=false",
                             ]
                             capture_command_output(cmd)
@@ -460,6 +514,8 @@ class PDFGenerator:
                                     "-o", str(temp_pdf),
                                     "--from", "markdown",
                                     "--variable", "fontsize=12pt",
+                                    "--variable", "mainfont=Arial",
+                                    "--variable", "sansfont=Arial",
                                     "--fail-if-warnings=false",
                                 ]
                                 capture_command_output(cmd)
