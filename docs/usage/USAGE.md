@@ -119,7 +119,7 @@ python main.py /path/to/media/folder --no-pdf
 python main.py /path/to/media/folder --verbose
 
 # Use different models
-python main.py /path/to/media/folder --whisper-model large --llm-model llama3
+python main.py /path/to/media/folder --whisper-model large --llm-model qwen2.5-coder:latest
 ```
 
 ## Advanced Options
@@ -151,7 +151,7 @@ Create a JSON configuration file for complex or repeatable setups:
 ```json
 {
   "whisper_model": "large",
-  "llm_model": "qwen3.5:latest",
+  "llm_model": "qwen2.5-coder:latest",
   "generate_pdf": true,
   "verbose": true,
   "output_dir": "/custom/output",

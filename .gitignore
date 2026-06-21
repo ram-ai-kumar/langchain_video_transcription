@@ -48,8 +48,8 @@ Thumbs.db
 # Summaries and study material (except in root and docs and config)
 *.md
 !/*.md
-!docs/*.md
-!config/*.md
+!docs/**/*.md
+!config/**/*.md
 
 # Generated PDFs
 *.pdf
