@@ -62,6 +62,7 @@ Thumbs.db
 *.out
 *.toc
 *.log
+INFO
 
 # But keep these important files
 !requirements.txt
