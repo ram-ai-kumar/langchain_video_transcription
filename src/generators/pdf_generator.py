@@ -70,20 +70,26 @@ class PDFGenerator:
                     pass
 
                 # Fallback to minimal configuration with tectonic (via stdin)
-                return self._generate_minimal_from_stdin(content, pdf_abs)
+                try:
+                    return self._generate_minimal_from_stdin(content, pdf_abs)
+                except PDFGenerationError:
+                    pass
+
+                # Final fallback: use inkmd (zero dependencies, handles problematic content)
+                return self._generate_with_inkmd(content, pdf_abs)
             else:
                 # No code blocks - use original file-based approach with header for colors
-                # Try with xelatex first (better LaTeX compatibility)
+                # Try with tectonic first (better package compatibility with header.tex)
                 try:
-                    result = self._generate_with_engine(markdown_abs, pdf_abs, "xelatex")
+                    result = self._generate_with_engine(markdown_abs, pdf_abs, "tectonic")
                     if result.success:
                         return result
                 except PDFGenerationError:
                     pass
 
-                # Try with tectonic as fallback
+                # Try with xelatex as fallback
                 try:
-                    result = self._generate_with_engine(markdown_abs, pdf_abs, "tectonic")
+                    result = self._generate_with_engine(markdown_abs, pdf_abs, "xelatex")
                     if result.success:
                         return result
                 except PDFGenerationError:
@@ -96,7 +102,13 @@ class PDFGenerator:
                     pass
 
                 # Final fallback: use stdin approach (no colors, but more compatible)
-                return self._generate_minimal_from_stdin(content, pdf_abs)
+                try:
+                    return self._generate_minimal_from_stdin(content, pdf_abs)
+                except PDFGenerationError:
+                    pass
+
+                # Ultimate fallback: use inkmd (zero dependencies, handles problematic content)
+                return self._generate_with_inkmd(content, pdf_abs)
 
         except Exception as e:
             raise PDFGenerationError(
@@ -166,13 +178,38 @@ class PDFGenerator:
     def _sanitize_unicode_whitespace(self, content: str) -> str:
         """Sanitize problematic Unicode whitespace characters in markdown content.
 
-        Replaces all space-like Unicode characters (e.g. \u202f, \u00a0, \t)
-        with standard spaces to prevent pandoc LaTeX engine errors.
+        Replaces only problematic Unicode whitespace characters (e.g. \u202f, \u00a0)
+        with standard spaces while preserving newlines and tabs to maintain markdown structure.
         """
         import re
-        # Replace all Unicode whitespace characters with standard spaces
-        sanitized = re.sub(r'\s', ' ', content)
-        return sanitized
+        # Replace only specific problematic Unicode whitespace, not all whitespace
+        # This preserves newlines, tabs, and other formatting-critical whitespace
+        problematic_chars = {
+            '\u00a0': ' ',    # Non-breaking space
+            '\u202f': ' ',    # Narrow non-breaking space
+            '\u205f': ' ',    # Medium mathematical space
+            '\u3000': ' ',    # Ideographic space
+            '\u2000': ' ',    # En quad
+            '\u2001': ' ',    # Em quad
+            '\u2002': ' ',    # En space
+            '\u2003': ' ',    # Em space
+            '\u2004': ' ',    # Three-per-em space
+            '\u2005': ' ',    # Four-per-em space
+            '\u2006': ' ',    # Six-per-em space
+            '\u2007': ' ',    # Figure space
+            '\u2008': ' ',    # Punctuation space
+            '\u2009': ' ',    # Thin space
+            '\u200a': ' ',    # Hair space
+            '\u200b': '',     # Zero-width space (remove)
+            '\u200c': '',     # Zero-width non-joiner (remove)
+            '\u200d': '',     # Zero-width joiner (remove)
+            '\ufeff': '',     # Zero-width no-break space (remove)
+        }
+        
+        for char, replacement in problematic_chars.items():
+            content = content.replace(char, replacement)
+        
+        return content
 
     def _sanitize_greek_characters(self, content: str) -> str:
         """Sanitize Greek Unicode characters by wrapping in LaTeX math mode.
@@ -602,9 +639,59 @@ class PDFGenerator:
         except (subprocess.CalledProcessError, FileNotFoundError):
             return False
 
+    def _generate_with_inkmd(self, content: str, pdf_path: Path) -> ProcessResult:
+        """Generate PDF using inkmd as a fallback for problematic files.
+
+        inkmd is a pure-Python markdown-to-PDF compiler with zero system dependencies.
+        It handles control characters and Unicode characters that Pandoc fails on.
+        """
+        try:
+            import inkmd
+        except ImportError:
+            raise PDFGenerationError(
+                "inkmd is not installed. Install with: pip install inkmd",
+                processor="PDFGenerator"
+            )
+
+        try:
+            pdf_abs = pdf_path.resolve()
+            
+            # Generate PDF bytes using inkmd
+            # Convert margins from cm to points (1 cm = 28.35 points)
+            margin_points = 2.5 * 28.35
+            pdf_bytes = inkmd.compile(
+                content,
+                page_size="a4",
+                margin=margin_points,  # Match header.tex margins (2.5cm in points)
+                font_size=12,  # Match header.tex fontsize
+                line_spacing=1.15,  # Match header.tex setstretch
+            )
+            
+            # Write PDF bytes to file
+            with open(pdf_abs, 'wb') as f:
+                f.write(pdf_bytes)
+
+            return ProcessResult(
+                success=True,
+                output_path=pdf_abs,
+                message="Successfully generated PDF using inkmd fallback",
+                metadata={
+                    "engine": "inkmd",
+                    "pdf_file": str(pdf_abs),
+                    "fallback_mode": True,
+                    "zero_dependencies": True
+                }
+            )
+
+        except Exception as e:
+            raise PDFGenerationError(
+                f"inkmd PDF generation failed: {e}",
+                processor="PDFGenerator"
+            )
+
     def get_dependency_info(self) -> dict:
         """Get information about available dependencies."""
-        info = {"pandoc": False, "latex_engines": []}
+        info = {"pandoc": False, "latex_engines": [], "inkmd": False}
 
         try:
             from src.utils.subprocess_utils import capture_command_output
@@ -619,6 +706,13 @@ class PDFGenerator:
             run_silent_command(["tectonic", "--version"])
             info["latex_engines"].append("tectonic")
         except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+
+        try:
+            import inkmd
+            info["inkmd"] = True
+            info["inkmd_version"] = "0.5.0"  # Current version in requirements.txt
+        except ImportError:
             pass
 
         return info

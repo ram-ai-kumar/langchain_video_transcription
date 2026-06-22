@@ -31,10 +31,10 @@ class TestVideoTranscriptionCLI:
         # Test that all expected arguments are present
         args = parser.parse_args(["/tmp/test"])
 
-        assert args.directory == Path("/tmp/test")
+        assert args.input_path == Path("/tmp/test")
         assert args.verbose is False
         assert args.whisper_model == "medium"
-        assert args.llm_model == "qwen3.5:latest"
+        assert args.llm_model == "qwen2.5-coder:latest"
 
     def test_parse_config_file_success(self, temp_dir):
         """Test successful config file parsing."""
@@ -139,7 +139,7 @@ class TestVideoTranscriptionCLI:
         test_dir = temp_dir / "test_input"
         test_dir.mkdir()
 
-        result = cli.validate_input_directory(test_dir)
+        result = cli.validate_input_path(test_dir)
 
         assert result is True
 
@@ -149,18 +149,19 @@ class TestVideoTranscriptionCLI:
 
         non_existent_dir = temp_dir / "non_existent"
 
-        result = cli.validate_input_directory(non_existent_dir)
+        result = cli.validate_input_path(non_existent_dir)
 
         assert result is False
 
     def test_validate_input_directory_not_directory(self, temp_dir):
-        """Test directory validation when path is not a directory."""
+        """Test path validation when path is a file (still valid for validate_input_path)."""
         cli = VideoTranscriptionCLI()
 
         # Create a file instead of directory
         test_file = temp_dir / "not_a_directory.txt"
         test_file.write_text("test")
 
-        result = cli.validate_input_directory(test_file)
+        result = cli.validate_input_path(test_file)
 
-        assert result is False
+        # validate_input_path accepts both files and directories
+        assert result is True

@@ -17,28 +17,28 @@ class TestProgressTracker:
         return ProgressTracker()
 
     def test_path_truncation_short_path(self, tracker):
-        """Test path truncation for short paths (≤3 levels)."""
+        """Test path truncation for short paths (fits within budget)."""
         # Test 2-level path
         short_path = Path("/data/video.mp4")
-        result = tracker._format_path(short_path)
-        assert result == "/data/video.mp4"
+        result = tracker._format_path(short_path, 80)
+        assert result == "data/video.mp4"
 
         # Test 3-level path
         medium_path = Path("/data/lectures/video.mp4")
-        result = tracker._format_path(medium_path)
-        assert result == "/data/lectures/video.mp4"
+        result = tracker._format_path(medium_path, 80)
+        assert result == "lectures/video.mp4"
 
     def test_path_truncation_long_path(self, tracker):
-        """Test path truncation for long paths (4+ levels)."""
-        # Test 4-level path
+        """Test path truncation for long paths (parent/filename extraction)."""
+        # Test 4-level path - _format_path shows parent/filename
         long_path = Path("/data/lectures/week1/video.mp4")
-        result = tracker._format_path(long_path)
-        assert result == "/lectures/week1/video.mp4"
+        result = tracker._format_path(long_path, 80)
+        assert result == "week1/video.mp4"
 
-        # Test 5+ level path
+        # Test 5+ level path - still shows parent/filename
         very_long_path = Path("/Users/ram/Work/Lab/code/video_transcription/data/lectures/week1/video.mp4")
-        result = tracker._format_path(very_long_path)
-        assert result == ".../lectures/week1/video.mp4"
+        result = tracker._format_path(very_long_path, 80)
+        assert result == "week1/video.mp4"
 
     def test_start_file_initialization(self, tracker):
         """Test starting file tracking initializes correctly."""
@@ -149,7 +149,6 @@ class TestProgressTracker:
             mock_print.assert_called()
             call_args = str(mock_print.call_args)
             assert "✓" in call_args
-            assert "audio > text > markdown > pdf" in call_args
 
     def test_clear_all_resets_state(self, tracker):
         """Test clear_all resets all tracking state."""

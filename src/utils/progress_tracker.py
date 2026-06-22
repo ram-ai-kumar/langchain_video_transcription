@@ -71,15 +71,17 @@ class ProgressTracker:
         terminal_width: int,
     ) -> str:
         if is_complete:
-            # Full pipeline chain on completion
-            stage_str = " > ".join(stages)
             prefix = "✓ "
-        else:
-            # Compact indicator during processing: [N/Total: stage_name]
-            total = len(stages)
-            stage_name = stages[current_stage] if current_stage < total else stages[-1]
-            stage_str = f"[{current_stage + 1}/{total}: {stage_name}]"
-            prefix = "  "
+            path_budget = terminal_width - len(prefix) - 1
+            path_budget = max(10, path_budget)
+            display_path = self._format_path(file_path, path_budget)
+            return f"{prefix}{display_path}"
+
+        # Compact indicator during processing: [N/Total: stage_name]
+        total = len(stages)
+        stage_name = stages[current_stage] if current_stage < total else stages[-1]
+        stage_str = f"[{current_stage + 1}/{total}: {stage_name}]"
+        prefix = "  "
 
         # Reserve: prefix (2) + 2 separating spaces + stage_str + 1 margin
         path_budget = terminal_width - len(prefix) - 2 - len(stage_str) - 1

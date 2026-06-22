@@ -83,9 +83,10 @@ def test_sanitize_unicode_whitespace(pdf_generator):
     assert '\u00a0' not in sanitized2
     assert 'Test Space' in sanitized2
 
-    # Test with tab
+    # Test with tab - tabs are preserved to maintain markdown formatting
     content_with_tab = "Test\tTab"
     sanitized3 = pdf_generator._sanitize_unicode_whitespace(content_with_tab)
 
-    assert '\t' not in sanitized3
-    assert 'Test Tab' in sanitized3
+    assert '\t' in sanitized3  # Tabs are preserved for markdown structure
+    assert 'Test' in sanitized3
+    assert 'Tab' in sanitized3

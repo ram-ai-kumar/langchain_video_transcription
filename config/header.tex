@@ -7,13 +7,10 @@
 \setsansfont{Arial}           % Consistent sans-serif for headings
 
 % Simple symbols instead of icons (more compatible)
-\usepackage{tikz}
 \usepackage{amssymb}  % Additional math symbols
 
 % Enhanced Unicode support for Greek letters and special characters
 \usepackage{amsmath,amssymb}  % Math symbols including Greek letters
-\usepackage{gensymb}  % Additional symbols
-\usepackage{mathrsfs}  % Math script fonts
 
 \usepackage{microtype}  % Improves typography
 
@@ -29,7 +26,7 @@
 \definecolor{codebackground}{RGB}{245,245,245}  % Light gray
 \definecolor{linkblue}{RGB}{0,123,255}          % Bright link blue
 
-% Headers and sections with symbols
+% Headers and sections with colors (using standard LaTeX commands)
 \usepackage{titlesec}
 \titleformat{\section}
   {\Large\bfseries\color{headingcolor}}{\thesection}{1em}{}

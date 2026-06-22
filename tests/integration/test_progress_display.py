@@ -86,10 +86,9 @@ class TestProgressDisplayIntegration:
         deep_path.touch()
 
         # Test path truncation logic directly
-        formatted_path = pipeline.progress_tracker._format_path(deep_path)
+        formatted_path = pipeline.progress_tracker._format_path(deep_path, 80)
 
-        # Should truncate long paths
-        assert formatted_path.startswith('.../')
+        # _format_path shows parent/filename
         assert 'level4' in formatted_path
         assert 'test_video.mp4' in formatted_path
 
@@ -149,7 +148,7 @@ class TestProgressDisplayIntegration:
         # Should contain the file path and progress indicator
         call_str = str(call_args)
         assert "test_video.mp4" in call_str
-        assert "..." in call_str  # Initial state shows just ...
+        assert "[1/4: audio]" in call_str  # Initial state shows stage indicator
 
     def test_progress_display_stage_progression(self, pipeline, config, tmp_path):
         """Test that progress display shows correct stage progression."""
